@@ -8,7 +8,9 @@ pub trait HasId {
 
 /// Implemented for all vectors of items that implement `HasId`
 pub trait VecHasIdExtensions {
+    #[must_use]
     fn filter_by_excludes(self, excludes: Vec<String>) -> Self;
+    #[must_use]
     fn dedupe_by_id(self) -> Self;
 }
 

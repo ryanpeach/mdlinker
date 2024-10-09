@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Cache Cargo dependencies and build
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Install rustup
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev libusb-1.0-0-dev libftdi1-dev libudev-dev valgrind
+
+    - name: Install cargo fmt, clippy
+      run: rustup component add rustfmt clippy
+
+    - name: Check Code Formatting
+      run: cargo fmt -- --check
+
+    - name: Check Code Linting
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Test
+      run: cargo test
+
+    - uses: taiki-e/install-action@cargo-binstall
+    - name: Install iai-callgrind-runner
+      run: |
+        version=$(cargo metadata --format-version=1 |\
+          jq '.packages[] | select(.name == "iai-callgrind").version' |\
+          tr -d '"'
+        )
+        cargo binstall --no-confirm iai-callgrind-runner --version $version
+
+    - name: Run Benchmarks
+      run: |
+        cargo bench

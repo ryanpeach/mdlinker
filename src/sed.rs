@@ -2,8 +2,16 @@
 //! Eventually actually replicating sed became to hard, so now
 //! I'm just using tuples of regex patterns
 
-use miette::{miette, Result};
 use regex::Regex;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ReplacePairError {
+    #[error("The 'from' pattern is not a valid regex")]
+    FromError(regex::Error),
+    #[error("The 'to' pattern is not valid regex")]
+    ToError(regex::Error)
+}
 
 /// A struct that holds a pair of regex patterns
 pub struct ReplacePair {
@@ -17,12 +25,12 @@ pub struct ReplacePair {
 impl ReplacePair {
     /// Create a new `ReplacePair` from two regex patterns as strings
     /// Will return errors if the patterns are not valid regex
-    pub fn new(from: &str, to: &str) -> Result<Self> {
+    pub fn new(from: &str, to: &str) -> Result<Self, ReplacePairError> {
         // Compile the 'from' pattern into a Regex object
         let from_regex =
-            Regex::new(from).map_err(|_| miette!("The 'from' pattern is not a valid regex"))?;
+            Regex::new(from).map_err(ReplacePairError::FromError)?;
         let to_regex =
-            Regex::new(to).map_err(|_| miette!("The 'to' pattern is not a valid regex"))?;
+            Regex::new(to).map_err(ReplacePairError::ToError)?;
         // The 'to' pattern is a literal replacement string
         Ok(ReplacePair {
             from: from_regex,
@@ -31,6 +39,7 @@ impl ReplacePair {
     }
 
     /// Apply replacement to an input string, and return the resultant string
+    #[must_use]
     pub fn apply(&self, input: &str) -> String {
         self.from.replace_all(input, self.to.as_str()).to_string()
     }
