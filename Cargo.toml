@@ -63,8 +63,3 @@ cast_precision_loss = "deny"
 too_many_lines = "allow"
 missing_errors_doc = "allow"
 similar_names = "allow"
-
-[package.metadata.clippy]
-# Allow panic and unwrap in test code
-allow-panic-in-tests = true
-allow-unwrap-in-tests = true
