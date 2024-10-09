@@ -1,0 +1,13 @@
+exclude = [
+    "file::name::similar::pathological demand avoidance::tv",
+    "file::name::similar::Seasonal Affective Disorder::tv",
+    "file::name::similar::Depression::Personal___2018 Depression",
+    "file::name::similar::Marxism::Writing___Marxism On Ai",
+    "file::name::similar::Marxism::Socialism___Marxist Leninism",
+    "file::name::similar::Person___Aquantance___Marcus Geduld::card",
+    "file::name::similar::Authoritarianism::Autism",
+    "file::name::similar::Dating::Person___Dating___Amanda",
+    "file::name::similar::Dating::Person___Dating",
+    "file::name::similar::Event::Marxism___Universal Equivalent",
+    "file::name::similar::Autism::Writing___Failure To Falsify Elements Of Consciousness In LLMs"
+]
