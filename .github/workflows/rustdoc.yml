@@ -1,0 +1,47 @@
+name: Deploy Docs to GitHub Pages
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+
+jobs:
+    release:
+        name: GitHub Pages
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: actions-rs/toolchain@v1
+              with:
+                toolchain: stable
+                profile: minimal
+                override: true
+                components: rustfmt, rust-src
+
+            - name: Install dependencies
+              run: |
+                sudo apt-get update
+                sudo apt-get install -y librust-alsa-sys-dev pkg-config libudev-dev
+
+            - name: Build Documentation
+              env:
+                RUSTFLAGS: "-D warnings"
+              run: cargo doc --all --no-deps --document-private-items
+
+            - name: Copy "assets/docs" directory
+              run: |
+                mkdir -p target/doc/assets
+                cp -r assets/docs target/doc/assets
+
+            - name: Deploy
+              if: github.ref == 'refs/heads/main'
+              uses: peaceiris/actions-gh-pages@v3
+              with:
+                github_token: ${{ secrets.GITHUB_TOKEN }}
+                publish_dir: ./target/doc
+                publish_branch: gh-pages
