@@ -3,20 +3,17 @@
 #![warn(clippy::unwrap_used)]
 #![allow(clippy::similar_names)]
 #![allow(dead_code)]
+#![allow(clippy::missing_errors_doc)]
 
-use error::VecHasIdExtensions;
-use file::name::SimilarFilenames;
+use mdlinker::config;
+use mdlinker::error::VecHasIdExtensions;
+use mdlinker::file;
+use mdlinker::file::name::SimilarFilenames;
 use miette::miette;
 use miette::Diagnostic;
 use thiserror::Error;
 
 use miette::Result;
-
-mod config;
-mod error;
-mod file;
-mod ngrams;
-mod sed;
 
 #[derive(Debug, Error, Diagnostic)]
 #[error("Output Report")]
@@ -35,7 +32,7 @@ fn main() -> Result<()> {
     env_logger::init();
 
     // Load the configuration
-    let config = config::Config::new()?;
+    let config = config::Config::new().map_err(|e| miette!(e))?;
 
     // Compile our regex patterns
     let boundary_regex = regex::Regex::new(&config.boundary_pattern()).map_err(|e| miette!(e))?;
@@ -51,6 +48,7 @@ fn main() -> Result<()> {
 
     // Calculate the similarity between filenames
     let matches = SimilarFilenames::calculate(&file_ngrams, config.filename_match_threshold())
+        .map_err(|e| miette!(e))?
         .filter_by_excludes(config.exclude())
         .dedupe_by_id();
 

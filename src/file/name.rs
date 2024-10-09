@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use walkdir::WalkDir;
-
 use crate::error::HasId;
 use crate::ngrams;
 
@@ -40,6 +39,7 @@ fn get_filename(path: &Path) -> String {
 }
 
 /// Generate n-grams from the filenames found in the directories
+#[must_use]
 pub fn ngrams(
     dirs: Vec<PathBuf>,
     ngram_size: usize,
@@ -84,16 +84,24 @@ pub struct SimilarFilenames {
     advice: String,
 }
 
+#[derive(thiserror::Error, Debug)]
+#[error("{path} does not contain the ngram {ngram}")]
+pub struct MissingSubstringError{
+    path: PathBuf,
+    ngram: String
+}
+
 impl SimilarFilenames {
     /// Create a new `SimilarFilenames` diagnostic
     /// based on the two filenames and their similar ngrams
+    ///
     pub fn new(
         file1_path: &Path,
         file1_ngram: &str,
         file2_path: &Path,
         file2_ngram: &str,
         score: i64,
-    ) -> Self {
+    ) -> Result<Self, MissingSubstringError> {
         // file paths as strings
         let file1 = file1_path.to_string_lossy();
         let file2 = file2_path.to_string_lossy();
@@ -105,10 +113,16 @@ impl SimilarFilenames {
         // Find the ngrams in each filepath
         let find1 = file1
             .find(file1_ngram)
-            .expect("Parameters say that this is a substring of file1");
+            .ok_or_else(|| MissingSubstringError {
+                path: file1_path.to_path_buf(),
+                ngram: file1_ngram.to_string(),
+            })?;
         let find2 = file2
             .find(file2_ngram)
-            .expect("Parameters say that this is a substring of file2");
+            .ok_or_else(|| MissingSubstringError {
+                path: file2_path.to_path_buf(),
+                ngram: file2_ngram.to_string(),
+            })?;
 
         // Create the spans
         let file1_ngram = SourceSpan::new(
@@ -136,19 +150,19 @@ impl SimilarFilenames {
         let advice = format!(
             "Maybe you should combine them into a single file?\nThe score was: {score:?}\nid: {id:?}"
         );
-        Self {
+        Ok(Self {
             id,
             filepaths,
             file1_ngram,
             file2_ngram,
             advice,
-        }
+        })
     }
 
     pub fn calculate(
         file_ngrams: &std::collections::HashMap<String, PathBuf>,
         filename_match_threshold: i64,
-    ) -> Vec<SimilarFilenames> {
+    ) -> Result<Vec<SimilarFilenames>, MissingSubstringError> {
         // Convert all filenames to a single string
         // Check if any two file ngrams fuzzy match
         // TODO: Unfortunately this is O(n^2)
@@ -191,7 +205,7 @@ impl SimilarFilenames {
                             other_filepath,
                             other_ngram,
                             score,
-                        ));
+                        )?);
                         break;
                     }
                 } else {
@@ -200,7 +214,7 @@ impl SimilarFilenames {
             }
         }
         file_crosscheck_bar.finish();
-        matches
+        Ok(matches)
     }
 }
 

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use miette::{miette, Result};
+use super::Error;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
@@ -49,8 +49,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(path: &Path) -> Result<Self> {
-        let contents = std::fs::read_to_string(path).map_err(|e| miette!(e))?;
-        toml::from_str(&contents).map_err(|e| miette!(e))
+    pub fn new(path: &Path) -> Result<Self, Error> {
+        let contents = std::fs::read_to_string(path).map_err(Error::FileDoesNotReadError)?;
+        toml::from_str(&contents).map_err(Error::FileDoesNotParseError)
     }
 }

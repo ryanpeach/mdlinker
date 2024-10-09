@@ -2,6 +2,7 @@ use regex::Regex;
 
 /// Gives you ngrams of size 1..=n
 /// Stops on boundary pattern
+#[must_use]
 pub fn up_to_n(text: &str, n: usize, boundary_regex: &Regex, spacing_regex: &Regex) -> Vec<String> {
     let mut ngrams = Vec::new();
 
