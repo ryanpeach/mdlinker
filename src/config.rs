@@ -5,20 +5,18 @@ use std::path::PathBuf;
 
 use crate::sed::{ReplacePair, ReplacePairError};
 use clap::Parser;
+use std::io;
 use thiserror;
 use toml;
-use std::io;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("The config file at {path} does not exist")]
-    FileDoesNotExistError{
-        path: PathBuf
-    },
+    FileDoesNotExistError { path: PathBuf },
     #[error("Failed to read the config file")]
     FileDoesNotReadError(#[from] io::Error),
     #[error("The config file does not have expected values")]
-    FileDoesNotParseError(#[from] toml::de::Error)
+    FileDoesNotParseError(#[from] toml::de::Error),
 }
 
 /// Config which contains both the cli and the config file
@@ -44,11 +42,13 @@ impl Config {
         if cli.config_path.is_file() {
             match file::Config::new(&cli.config_path) {
                 Ok(file) => Ok(Self { cli, file }),
-                Err(report) => Err(report)
+                Err(report) => Err(report),
             }
         } else {
-            Err(Error::FileDoesNotExistError{ path: cli.config_path })
-        } 
+            Err(Error::FileDoesNotExistError {
+                path: cli.config_path,
+            })
+        }
     }
 
     #[must_use]
@@ -112,7 +112,7 @@ impl Config {
         }
     }
 
-    /// Converts filepaths to titles using the from and to regexes defined in the 
+    /// Converts filepaths to titles using the from and to regexes defined in the
     /// [`file::Config`]`.filepath_to_title` option.
     ///
     /// # Errors
@@ -134,7 +134,7 @@ impl Config {
         Ok(out)
     }
 
-    /// Converts titles to filepaths using the from and to regexes defined in the 
+    /// Converts titles to filepaths using the from and to regexes defined in the
     /// [`file::Config`]`.title_to_filepath` option.
     ///
     /// The opposite of [`Config::filepath_to_title`]

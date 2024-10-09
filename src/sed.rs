@@ -10,7 +10,7 @@ pub enum ReplacePairError {
     #[error("The 'from' pattern is not a valid regex")]
     FromError(regex::Error),
     #[error("The 'to' pattern is not valid regex")]
-    ToError(regex::Error)
+    ToError(regex::Error),
 }
 
 /// A struct that holds a pair of regex patterns
@@ -27,10 +27,8 @@ impl ReplacePair {
     /// Will return errors if the patterns are not valid regex
     pub fn new(from: &str, to: &str) -> Result<Self, ReplacePairError> {
         // Compile the 'from' pattern into a Regex object
-        let from_regex =
-            Regex::new(from).map_err(ReplacePairError::FromError)?;
-        let to_regex =
-            Regex::new(to).map_err(ReplacePairError::ToError)?;
+        let from_regex = Regex::new(from).map_err(ReplacePairError::FromError)?;
+        let to_regex = Regex::new(to).map_err(ReplacePairError::ToError)?;
         // The 'to' pattern is a literal replacement string
         Ok(ReplacePair {
             from: from_regex,

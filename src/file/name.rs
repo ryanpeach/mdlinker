@@ -1,3 +1,5 @@
+use crate::error::HasId;
+use crate::ngrams;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use indicatif::ProgressBar;
@@ -7,8 +9,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use walkdir::WalkDir;
-use crate::error::HasId;
-use crate::ngrams;
 
 /// Walk the directories and get just the files
 fn get_files(dirs: Vec<PathBuf>) -> Vec<PathBuf> {
@@ -86,9 +86,9 @@ pub struct SimilarFilenames {
 
 #[derive(thiserror::Error, Debug)]
 #[error("{path} does not contain the ngram {ngram}")]
-pub struct MissingSubstringError{
+pub struct MissingSubstringError {
     path: PathBuf,
-    ngram: String
+    ngram: String,
 }
 
 impl SimilarFilenames {
