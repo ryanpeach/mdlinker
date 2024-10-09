@@ -40,8 +40,8 @@ debug = true
 channel = "stable"
 components = ["clippy"]
 
-# [lints.rust]
-# missing_docs = "deny"
+[lints.rust]
+missing_docs = "deny"
 
 [lints.rustdoc]
 missing_crate_level_docs = "warn"
@@ -55,7 +55,7 @@ unwrap_used = "warn"
 panic = "warn"
 trivially_copy_pass_by_ref = "warn"
 inefficient_to_string = "warn"
-# missing_docs_in_private_items = "warn"
+missing_docs_in_private_items = "warn"
 doc_markdown = "warn"
 missing_fields_in_debug = "warn"
 redundant_clone = "warn"
