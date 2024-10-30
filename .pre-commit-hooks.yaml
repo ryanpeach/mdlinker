@@ -1,0 +1,6 @@
+-   id: mklinker
+    name: Markdown Linker
+    description: This hook checks that all markdown links are accounted for.
+    entry: mklinker
+    language: rust
+    pass_filenames: false

@@ -1,0 +1,65 @@
+[package]
+name = "mdlinker"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+debug = false
+
+[dependencies]
+clap = { version = "4.5.16", features = ["derive"] }
+env_logger = "0.11.5"
+fuzzy-matcher = "0.3.7"
+indicatif = "0.17.8"
+log = "0.4.22"
+miette = { version = "7.2.0", features = ["fancy"] }
+rayon = "1.10.0"
+regex = "1.10.6"
+serde = { version = "1.0.208", features = ["derive"] }
+serde_yaml = "0.9.34"
+thiserror = "1.0.63"
+toml = "0.8.19"
+walkdir = "2.5.0"
+
+[dev-dependencies]
+iai-callgrind = "0.14.0"
+
+[[bench]]
+name    = "bench_main"
+harness = false
+
+[profile.bench]
+debug = true
+
+[toolchain]
+channel = "stable"
+components = ["clippy"]
+
+# [lints.rust]
+# missing_docs = "deny"
+
+[lints.clippy]
+# Enable specific Clippy lints
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+panic = "warn"
+trivially_copy_pass_by_ref = "warn"
+inefficient_to_string = "warn"
+# missing_docs_in_private_items = "warn"
+doc_markdown = "warn"
+missing_fields_in_debug = "warn"
+redundant_clone = "warn"
+
+# Deny these lints
+cast_possible_truncation = "deny"
+cast_precision_loss = "deny"
+
+# Allow these lints
+too_many_lines = "allow"
+missing_errors_doc = "allow"
+similar_names = "allow"
