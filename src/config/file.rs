@@ -2,10 +2,12 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::Error;
+use crate::sed::{ReplacePair, ReplacePairError};
+
+use super::{Error, Partial};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
-pub struct Config {
+pub(super) struct Config {
     /// The directories to search in
     /// May provide more than one directory
     #[serde(default)]
@@ -52,5 +54,80 @@ impl Config {
     pub fn new(path: &Path) -> Result<Self, Error> {
         let contents = std::fs::read_to_string(path).map_err(Error::FileDoesNotReadError)?;
         toml::from_str(&contents).map_err(Error::FileDoesNotParseError)
+    }
+}
+
+impl Partial for Config {
+    fn directories(&self) -> Option<Vec<PathBuf>> {
+        let out = self.directories.clone();
+        if out.is_empty() {
+            None
+        } else {
+            Some(out)
+        }
+    }
+
+    fn ngram_size(&self) -> Option<usize> {
+        self.ngram_size
+    }
+
+    fn boundary_pattern(&self) -> Option<String> {
+        self.boundary_pattern.clone()
+    }
+
+    fn filename_spacing_pattern(&self) -> Option<String> {
+        self.filename_spacing_pattern.clone()
+    }
+
+    fn filename_match_threshold(&self) -> Option<i64> {
+        self.filename_match_threshold
+    }
+
+    fn exclude(&self) -> Option<Vec<String>> {
+        let out = self.exclude.clone();
+        if out.is_empty() {
+            None
+        } else {
+            Some(out)
+        }
+    }
+
+    fn filepath_to_title(&self) -> Option<Result<Vec<Vec<ReplacePair>>, ReplacePairError>> {
+        let out = self.filepath_to_title.clone();
+        if out.is_empty() {
+            None
+        } else {
+            let mut res = Vec::new();
+            for inner in out {
+                let mut inner_res = Vec::new();
+                for (find, replace) in inner {
+                    match ReplacePair::new(&find, &replace) {
+                        Ok(pair) => inner_res.push(pair),
+                        Err(e) => return Some(Err(e)),
+                    }
+                }
+                res.push(inner_res);
+            }
+            Some(Ok(res))
+        }
+    }
+    fn title_to_filepath(&self) -> Option<Result<Vec<Vec<ReplacePair>>, ReplacePairError>> {
+        let out = self.title_to_filepath.clone();
+        if out.is_empty() {
+            None
+        } else {
+            let mut res = Vec::new();
+            for inner in out {
+                let mut inner_res = Vec::new();
+                for (find, replace) in inner {
+                    match ReplacePair::new(&find, &replace) {
+                        Ok(pair) => inner_res.push(pair),
+                        Err(e) => return Some(Err(e)),
+                    }
+                }
+                res.push(inner_res);
+            }
+            Some(Ok(res))
+        }
     }
 }

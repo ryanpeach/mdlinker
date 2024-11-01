@@ -28,21 +28,21 @@ fn main() -> Result<()> {
     let config = config::Config::new().map_err(|e| miette!(e))?;
 
     // Compile our regex patterns
-    let boundary_regex = regex::Regex::new(&config.boundary_pattern()).map_err(|e| miette!(e))?;
+    let boundary_regex = regex::Regex::new(config.boundary_pattern()).map_err(|e| miette!(e))?;
     let filename_spacing_regex =
-        regex::Regex::new(&config.filename_spacing_pattern()).map_err(|e| miette!(e))?;
+        regex::Regex::new(config.filename_spacing_pattern()).map_err(|e| miette!(e))?;
 
     let file_ngrams = file::name::ngrams(
-        config.directories(),
-        config.ngram_size(),
+        config.directories().clone(),
+        *config.ngram_size(),
         &boundary_regex,
         &filename_spacing_regex,
     );
 
     // Calculate the similarity between filenames
-    let matches = SimilarFilenames::calculate(&file_ngrams, config.filename_match_threshold())
+    let matches = SimilarFilenames::calculate(&file_ngrams, *config.filename_match_threshold())
         .map_err(|e| miette!(e))?
-        .filter_by_excludes(config.exclude())
+        .filter_by_excludes(config.exclude().clone())
         .dedupe_by_id();
 
     // Return

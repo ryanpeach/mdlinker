@@ -1,10 +1,13 @@
+use clap::Parser;
 use std::path::PathBuf;
 
-use clap::Parser;
+use crate::sed::{ReplacePair, ReplacePairError};
+
+use super::Partial;
 
 #[derive(Parser, Default)]
 #[command(version, about, long_about = None)]
-pub struct Cli {
+pub(super) struct Config {
     /// The directories to search in
     /// May provide more than one directory
     #[clap(short = 'd', long = "dir")]
@@ -12,6 +15,7 @@ pub struct Cli {
 
     /// Path to a configuration file
     #[clap(short = 'c', long = "config", default_value = "mdlinker.toml")]
+    #[allow(clippy::struct_field_names)]
     pub config_path: PathBuf,
 
     /// Size of the n-grams to generate from filenames
@@ -35,4 +39,41 @@ pub struct Cli {
     /// If an error code **starts with** this string, it will be excluded
     #[clap(short = 'e', long = "exclude")]
     pub exclude: Vec<String>,
+}
+
+impl Partial for Config {
+    fn directories(&self) -> Option<Vec<PathBuf>> {
+        let out = self.directories.clone();
+        if out.is_empty() {
+            None
+        } else {
+            Some(out)
+        }
+    }
+    fn ngram_size(&self) -> Option<usize> {
+        self.ngram_size
+    }
+    fn boundary_pattern(&self) -> Option<String> {
+        self.boundary_pattern.clone()
+    }
+    fn filename_spacing_pattern(&self) -> Option<String> {
+        self.filename_spacing_pattern.clone()
+    }
+    fn filename_match_threshold(&self) -> Option<i64> {
+        self.filename_match_threshold
+    }
+    fn exclude(&self) -> Option<Vec<String>> {
+        let out = self.exclude.clone();
+        if out.is_empty() {
+            None
+        } else {
+            Some(out)
+        }
+    }
+    fn filepath_to_title(&self) -> Option<Result<Vec<Vec<ReplacePair>>, ReplacePairError>> {
+        None
+    }
+    fn title_to_filepath(&self) -> Option<Result<Vec<Vec<ReplacePair>>, ReplacePairError>> {
+        None
+    }
 }
