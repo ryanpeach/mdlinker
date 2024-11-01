@@ -7,7 +7,10 @@ use mdlinker::{config, lib};
 #[test]
 fn groups_first_element_same() {
     let config = config::Config::builder()
-        .directories(vec![PathBuf::from_str("./assets/pages").unwrap()])
+        .directories(vec![PathBuf::from_str(
+            "./tests/logseq/similar_filename/assets/pages",
+        )
+        .unwrap()])
         .filename_match_threshold(80)
         .build();
 
@@ -16,12 +19,7 @@ fn groups_first_element_same() {
     }
 }
 
-#[test]
-fn some_valid_match() {
-    unimplemented!()
-}
-
-#[test]
-fn miette_formatting() {
-    unimplemented!()
-}
+// #[test]
+// fn some_valid_match() {
+//     unimplemented!()
+// }

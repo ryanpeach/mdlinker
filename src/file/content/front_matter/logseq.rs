@@ -11,7 +11,7 @@ use crate::file::Error;
 pub struct Config {
     /// The aliases of the file
     #[serde(default)]
-    pub alias: Vec<String>,
+    pub aliases: Vec<String>,
 }
 
 fn parse_csv(contents: &str) -> Result<Vec<String>, Error> {
@@ -39,13 +39,13 @@ impl Config {
                 }
                 let alias =
                     parse_csv(&caps[1]).expect("Already checked for exactly one capture group.");
-                Ok(Self { alias })
+                Ok(Self { aliases: alias })
             }
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.alias.is_empty()
+        self.aliases.is_empty()
     }
 }
 
@@ -66,7 +66,7 @@ mod tests {
         // create the config
         let config = Config::new(text).unwrap();
         assert_eq!(
-            config.alias,
+            config.aliases,
             vec![
                 "name1".to_string(),
                 "name2".to_string(),

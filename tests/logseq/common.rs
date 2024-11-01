@@ -5,12 +5,15 @@ use mdlinker::{config, lib};
 
 /// Runs the library and generates the [`mdlinker::OutputReport`]
 #[must_use]
-pub fn get_report() -> mdlinker::OutputReport {
+pub fn get_report(paths: &[String]) -> mdlinker::OutputReport {
     let config = config::Config::builder()
-        .directories(vec![
-            PathBuf::from_str("./assets/pages").expect("This path exists at compile time.")
-        ])
+        .directories(
+            paths
+                .iter()
+                .map(|path| PathBuf::from_str(path).expect("This path exists at compile time."))
+                .collect(),
+        )
         .build();
 
-    lib(&config).expect("Shouldn't be a problem with the linter itself")
+    lib(&config).expect("There's a problem with the linter itself")
 }

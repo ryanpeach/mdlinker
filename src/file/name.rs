@@ -21,7 +21,8 @@ pub fn get_filename(path: &Path) -> String {
         .split('.')
         .next()
         .expect("File paths will either have a file extension or not, it makes no difference")
-        .to_string();
+        .to_string()
+        .to_lowercase();
 }
 
 /// Get the segments of a filename based on [`boundary_regex`]

@@ -14,13 +14,17 @@ impl FrontMatter {
         // Try to parse as YAML
         let out = yaml::Config::new(contents)?;
         if !out.is_empty() {
-            return Ok(FrontMatter { aliases: out.alias });
+            return Ok(FrontMatter {
+                aliases: out.aliases.iter().map(|x| x.to_lowercase()).collect(),
+            });
         }
 
         // Try to parse as Logseq
         let out = logseq::Config::new(contents)?;
         if !out.is_empty() {
-            return Ok(FrontMatter { aliases: out.alias });
+            return Ok(FrontMatter {
+                aliases: out.aliases.iter().map(|x| x.to_lowercase()).collect(),
+            });
         }
 
         // If we can't parse it, return the default

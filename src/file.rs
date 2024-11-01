@@ -6,6 +6,8 @@ use thiserror::Error;
 
 use std;
 
+use crate::sed::RegexError;
+
 pub mod content;
 pub mod name;
 
@@ -33,4 +35,6 @@ pub enum Error {
     SerdeError(#[from] serde_yaml::Error),
     #[error("Found duplicate property {0} in file contents")]
     DuplicateProperty(String),
+    #[error("Regex error: {0}")]
+    RegexError(#[from] RegexError),
 }
