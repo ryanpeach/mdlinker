@@ -32,7 +32,7 @@ pub struct Config {
     ngram_size: usize,
     #[builder(default=r"\s".to_owned())]
     boundary_pattern: String,
-    #[builder(default=r"\[\[\*]]|#\b[\w_]+\b|#\[\[.*?]]".to_owned())]
+    #[builder(default=r"#?\[\[(.*?)]]|#([A-Za-z0-9_]+)".to_owned())]
     wikilink_pattern: String,
     #[builder(default=r"___|__|-|_|\s".to_owned())]
     filename_spacing_pattern: String,

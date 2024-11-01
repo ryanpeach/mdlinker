@@ -18,6 +18,18 @@ pub struct MissingSubstringError {
 }
 
 #[derive(Error, Debug)]
+pub enum RegexError {
+    #[error("The pattern is not a valid regex")]
+    CompileError(regex::Error),
+    #[error("Nothing was captured in position {pos} for the regex {pattern} matching {mat}")]
+    CaptureError {
+        pos: usize,
+        pattern: String,
+        mat: String,
+    },
+}
+
+#[derive(Error, Debug)]
 pub enum ReplacePairError {
     #[error("The 'from' pattern is not a valid regex")]
     FromError(regex::Error),

@@ -10,8 +10,8 @@ use crate::file::Error;
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
     /// The aliases of the file
-    #[serde(default)]
-    pub alias: Vec<String>,
+    #[serde(default, rename = "alias")]
+    pub aliases: Vec<String>,
 }
 
 impl Config {
@@ -31,7 +31,7 @@ impl Config {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.alias.is_empty()
+        self.aliases.is_empty()
     }
 }
 
@@ -45,7 +45,7 @@ mod tests {
         // create the config
         let config = Config::new(text).unwrap();
         assert_eq!(
-            config.alias,
+            config.aliases,
             vec!["a".to_string(), "b".to_string(), "c".to_string()]
         );
     }

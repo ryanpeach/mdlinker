@@ -3,7 +3,6 @@ use std::{fs, path::PathBuf};
 
 use cached::proc_macro::cached;
 use front_matter::FrontMatter;
-use regex::Regex;
 use wikilink::Wikilink;
 
 use super::Error;
@@ -27,11 +26,7 @@ pub fn from_file(path: PathBuf, wikilink_pattern: String) -> Result<FromFile, Er
     Ok(FromFile {
         path,
         front_matter: FrontMatter::new(&contents)?,
-        wikilinks: Wikilink::get_wikilinks(
-            &contents,
-            &Regex::new(&wikilink_pattern).expect(
-                "By necessity (due to caching), you need to have checked this ahead of time",
-            ),
-        ),
+        wikilinks: Wikilink::get_wikilinks(&contents, &wikilink_pattern)
+            .map_err(Error::RegexError)?,
     })
 }

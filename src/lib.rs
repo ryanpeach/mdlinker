@@ -73,7 +73,12 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
 
     // Unfortunately we can't continue if we have duplicate aliases
     if !duplicate_aliases.is_empty() {
-        return Err(miette!("Duplicate aliases found"));
+        // Return
+        return Ok(OutputReport::builder()
+            .similar_filenames(similar_filenames)
+            .duplicate_aliases(duplicate_aliases)
+            .broken_wikilinks(vec![])
+            .build());
     }
 
     let broken_wikilinks =
