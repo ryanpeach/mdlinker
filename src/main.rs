@@ -9,14 +9,28 @@ fn main() -> Result<()> {
     // Load the configuration
     let config = config::Config::new().map_err(|e| miette!(e))?;
 
+    let mut nb_errors = 0;
     match lib(&config) {
-        Err(e) => Err(e),
+        Err(e) => Err(e)?,
         Ok(e) => {
-            if e.is_empty() {
-                Ok(())
-            } else {
-                Err(miette!(e))
+            for error in e.similar_filenames {
+                nb_errors += 1;
+                log::error!("{}", miette!(error));
+            }
+            for error in e.duplicate_aliases {
+                nb_errors += 1;
+                log::error!("{}", miette!(error));
+            }
+            for error in e.broken_wikilinks {
+                nb_errors += 1;
+                log::error!("{}", miette!(error));
             }
         }
+    }
+
+    if nb_errors > 0 {
+        Err(miette!("Lint rules violated: {nb_errors}"))
+    } else {
+        Ok(())
     }
 }

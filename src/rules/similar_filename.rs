@@ -1,8 +1,8 @@
-use crate::{file::name::get_filename, rules::HasCode, sed::MissingSubstringError};
+use crate::{file::name::get_filename, rules::HasId, sed::MissingSubstringError};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use indicatif::ProgressBar;
-use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
+use miette::{Diagnostic, SourceOffset, SourceSpan};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -13,10 +13,10 @@ pub const CODE: &str = "name::similar";
 #[diagnostic(code(CODE))]
 pub struct SimilarFilename {
     /// Used to identify the diagnostic and exclude it if needed
-    code: String,
+    id: String,
 
     #[source_code]
-    filepaths: NamedSource<String>,
+    filepaths: String,
 
     #[label("This bit here")]
     file1_ngram: SourceSpan,
@@ -30,13 +30,13 @@ pub struct SimilarFilename {
 
 impl PartialEq for SimilarFilename {
     fn eq(&self, other: &Self) -> bool {
-        self.code == other.code
+        self.id == other.id
     }
 }
 
-impl HasCode for SimilarFilename {
-    fn code(&self) -> String {
-        self.code.clone()
+impl HasId for SimilarFilename {
+    fn id(&self) -> String {
+        self.id.clone()
     }
 }
 
@@ -57,7 +57,7 @@ impl SimilarFilename {
 
         // Assemble the source
         let source = format!("{file1}\n{file2}");
-        let filepaths = NamedSource::new("Filepaths", source.clone());
+        let filepaths = source.clone();
 
         // Find the ngrams in each filepath
         let find1 = file1.find(file1_ngram).ok_or_else(|| {
@@ -100,7 +100,7 @@ impl SimilarFilename {
             "Maybe you should combine them into a single file?\nThe score was: {score:?}\nid: {id:?}"
         );
         Ok(Self {
-            code: id,
+            id,
             filepaths,
             file1_ngram,
             file2_ngram,

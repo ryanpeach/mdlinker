@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::{file::content::from_file, rules::duplicate_alias::DuplicateAlias};
 
-use super::HasCode;
+use super::HasId;
 
 pub const CODE: &str = "content::wikilink::broken";
 
@@ -14,27 +14,27 @@ pub const CODE: &str = "content::wikilink::broken";
 #[diagnostic(code(CODE))]
 pub struct BrokenWikilink {
     /// Used to identify the diagnostic and exclude it if needed
-    code: String,
+    id: String,
 
     #[source_code]
-    filepaths: NamedSource<String>,
+    src: NamedSource<String>,
 
     #[label("Wikilink")]
     wikilink: SourceSpan,
 
     #[help]
-    most_similar: String,
+    advice: String,
 }
 
 impl PartialEq for BrokenWikilink {
     fn eq(&self, other: &Self) -> bool {
-        self.code == other.code
+        self.id == other.id
     }
 }
 
-impl HasCode for BrokenWikilink {
-    fn code(&self) -> String {
-        self.code.clone()
+impl HasId for BrokenWikilink {
+    fn id(&self) -> String {
+        self.id.clone()
     }
 }
 
