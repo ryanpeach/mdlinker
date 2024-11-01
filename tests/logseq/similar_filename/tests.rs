@@ -15,3 +15,13 @@ fn groups_first_element_same() {
         panic!("There should have been no error. Found: {e}");
     }
 }
+
+#[test]
+fn some_valid_match() {
+    unimplemented!()
+}
+
+#[test]
+fn miette_formatting() {
+    unimplemented!()
+}

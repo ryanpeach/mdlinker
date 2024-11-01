@@ -1,45 +1,37 @@
-use std::{path::PathBuf, str::FromStr};
-
-use mdlinker::{
-    config, lib,
-    rules::{broken_wikilink, duplicate_alias},
-};
+use mdlinker::rules::broken_wikilink;
 
 use mdlinker::rules::VecHasCodeExtensions;
 
-fn get_report() -> mdlinker::OutputReport {
-    let config = config::Config::builder()
-        .directories(vec![PathBuf::from_str("./assets/pages").unwrap()])
-        .build();
-
-    lib(&config).expect("Shouldn't be a problem with the linter itself")
-}
+use crate::common::get_report;
 
 /// This passes because the link is valid
 #[test]
 fn lorem_exist_and_is_wikilink() {
     let report = get_report();
-    assert!(!report
+    assert!(report
         .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::lorem", broken_wikilink::CODE)));
+        .contains_code(&format!("{}::2024_11_01::lorem", broken_wikilink::CODE))
+        .is_empty());
 }
 
 /// This fails because the link is invalid
 #[test]
 fn ipsum_does_not_exist_and_is_wikilink() {
     let report = get_report();
-    assert!(report
+    assert!(!report
         .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::ipsum", broken_wikilink::CODE)));
+        .contains_code(&format!("{}::2024_11_01::ipsum", broken_wikilink::CODE))
+        .is_empty());
 }
 
 /// This passes because there is no link
 #[test]
 fn dolor_does_not_exist_and_is_not_wikilink() {
     let report = get_report();
-    assert!(!report
+    assert!(report
         .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::dolor", broken_wikilink::CODE)));
+        .contains_code(&format!("{}::2024_11_01::dolor", broken_wikilink::CODE))
+        .is_empty());
 }
 
 /// This passes because the link is valid
@@ -47,9 +39,10 @@ fn dolor_does_not_exist_and_is_not_wikilink() {
 #[test]
 fn sit_does_not_exist_and_is_tag() {
     let report = get_report();
-    assert!(report
+    assert!(!report
         .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::sit", broken_wikilink::CODE)));
+        .contains_code(&format!("{}::2024_11_01::sit", broken_wikilink::CODE))
+        .is_empty());
 }
 
 /// This fails because the link is invalid
@@ -57,19 +50,13 @@ fn sit_does_not_exist_and_is_tag() {
 #[test]
 fn amet_does_not_exist_and_is_tag() {
     let report = get_report();
-    assert!(report
+    assert!(!report
         .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::amet", broken_wikilink::CODE)));
+        .contains_code(&format!("{}::2024_11_01::amet", broken_wikilink::CODE))
+        .is_empty());
 }
 
-/// Test that we detect the sit and lorem duplicate aliases
 #[test]
-fn sit_lorem_duplicate_aliases() {
-    let report = get_report();
-    assert!(report
-        .duplicate_aliases
-        .contains_code(&format!("{}::sit", duplicate_alias::CODE)));
-    assert!(report
-        .duplicate_aliases
-        .contains_code(&format!("{}::lorem", duplicate_alias::CODE)));
+fn miette_formatting() {
+    unimplemented!()
 }

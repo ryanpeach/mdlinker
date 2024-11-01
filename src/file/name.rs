@@ -26,7 +26,7 @@ pub fn get_filename(path: &Path) -> String {
 
 /// Get the segments of a filename based on [`boundary_regex`]
 #[must_use]
-pub fn filename_segments(path: &PathBuf, boundary_regex: &Regex) -> Vec<String> {
+pub fn filename_segments(path: &Path, boundary_regex: &Regex) -> Vec<String> {
     let filename = get_filename(path);
     boundary_regex
         .split(&filename)
