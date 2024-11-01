@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use miette::{miette, Result};
+use crate::file::Error;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
@@ -15,7 +15,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(contents: &str) -> Result<Self> {
+    pub fn new(contents: &str) -> Result<Self, Error> {
         // See if contents contains "---" and a newline and another "---" using multiline regex
         let re = regex::Regex::new(r"(?s)---\n(.*)\n---").expect("Its a constant.");
         let frontmatter = re.captures(contents);
@@ -25,7 +25,7 @@ impl Config {
             None => Ok(Self::default()),
             Some(caps) => {
                 // Parse the YAML
-                serde_yaml::from_str(&caps[1]).map_err(|e| miette!(e))
+                serde_yaml::from_str(&caps[1]).map_err(Error::SerdeError)
             }
         }
     }

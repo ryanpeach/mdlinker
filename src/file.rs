@@ -2,6 +2,10 @@ use std::path::PathBuf;
 
 use walkdir::WalkDir;
 
+use thiserror::Error;
+
+use std;
+
 pub mod content;
 pub mod name;
 
@@ -17,4 +21,16 @@ pub fn get_files(dirs: Vec<PathBuf>) -> Vec<PathBuf> {
         }
     }
     out
+}
+
+/// A bunch of bad things can happen while you're reading files,
+/// This covers most of them.
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Error reading the file.")]
+    IoError(#[from] std::io::Error),
+    #[error("Error parsing the yaml based on expected template.")]
+    SerdeError(#[from] serde_yaml::Error),
+    #[error("Found duplicate property {0} in file contents")]
+    DuplicateProperty(String),
 }

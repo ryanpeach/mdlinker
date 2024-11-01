@@ -3,8 +3,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use miette::{miette, Result};
 use regex::Regex;
+
+use crate::file::Error;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
@@ -13,7 +14,7 @@ pub struct Config {
     pub alias: Vec<String>,
 }
 
-fn parse_csv(contents: &str) -> Result<Vec<String>> {
+fn parse_csv(contents: &str) -> Result<Vec<String>, Error> {
     contents
         .split(',')
         .map(|s| Ok(s.trim().to_string()))
@@ -21,7 +22,7 @@ fn parse_csv(contents: &str) -> Result<Vec<String>> {
 }
 
 impl Config {
-    pub fn new(contents: &str) -> Result<Self> {
+    pub fn new(contents: &str) -> Result<Self, Error> {
         // find alias:: and capture the rest of the line as csv
         let re = Regex::new(r"alias::\s*(.*)").expect("Its a constant.");
 
@@ -34,7 +35,7 @@ impl Config {
                 // The first capture group is the regex match as a whole
                 // The second is the parenthesized subexpression
                 if caps.len() > 2 {
-                    return Err(miette!("More than one alias property found."));
+                    return Err(Error::DuplicateProperty("alias".to_owned()));
                 }
                 let alias =
                     parse_csv(&caps[1]).expect("Already checked for exactly one capture group.");

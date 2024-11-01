@@ -1,18 +1,16 @@
 mod logseq;
 mod yaml;
 
-use std::path::PathBuf;
+use super::Error;
 
-use miette::{miette, Result};
-
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FrontMatter {
     /// The aliases of the file
     pub aliases: Vec<String>,
 }
 
 impl FrontMatter {
-    pub fn new(contents: &str) -> Result<Self> {
+    pub fn new(contents: &str) -> Result<Self, Error> {
         // Try to parse as YAML
         let out = yaml::Config::new(contents)?;
         if !out.is_empty() {
@@ -27,11 +25,6 @@ impl FrontMatter {
 
         // If we can't parse it, return the default
         Ok(Self::default())
-    }
-
-    pub fn from_file(path: &PathBuf) -> Result<Self> {
-        let contents = std::fs::read_to_string(path).map_err(|e| miette!(e))?;
-        Self::new(&contents)
     }
 }
 
