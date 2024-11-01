@@ -4,7 +4,7 @@ use bon::Builder;
 use miette::{miette, Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
 use thiserror::Error;
 
-use crate::{file::content::front_matter::FrontMatter, sed::MissingSubstringError};
+use crate::{file::content::from_file, sed::MissingSubstringError};
 
 use super::HasCode;
 
@@ -173,7 +173,7 @@ impl DuplicateAlias {
         let mut lookup_table = HashMap::<String, PathBuf>::new();
         let mut duplicates: Vec<DuplicateAlias> = Vec::new();
         for file_path in files {
-            let front_matter = FrontMatter::from_file(&file_path).map_err(|e| miette!(e))?;
+            let front_matter = from_file(file_path.clone()).map_err(|e| miette!(e))?;
             for alias in front_matter.aliases {
                 if let Some(out) = lookup_table.insert(alias.clone(), file_path.clone()) {
                     duplicates.push(

@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use miette::{miette, Diagnostic, NamedSource, Result, SourceSpan};
 use thiserror::Error;
 
-use crate::{file::content::front_matter::FrontMatter, rules::duplicate_alias::DuplicateAlias};
+use crate::{file::content::from_file, rules::duplicate_alias::DuplicateAlias};
 
 use super::HasCode;
 
@@ -46,8 +46,7 @@ impl BrokenWikilink {
         // In this case the developer forgot to run the duplicate aliases rule first
         let mut lookup_table = HashMap::<String, PathBuf>::new();
         for file_path in files {
-            let front_matter =
-                FrontMatter::from_file(&file_path).expect("This file was reported as existing");
+            let front_matter = from_file(file_path.clone()).map_err(|e| miette!(e))?;
             for alias in front_matter.aliases {
                 if let Some(out) = lookup_table.insert(alias.clone(), file_path.clone()) {
                     return match DuplicateAlias::new(&alias, &out, &file_path) {

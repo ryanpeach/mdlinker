@@ -13,6 +13,7 @@ debug = false
 
 [dependencies]
 bon = "2.3.0"
+cached = "0.53.1"
 clap = { version = "4.5.16", features = ["derive"] }
 env_logger = "0.11.5"
 fuzzy-matcher = "0.3.7"
