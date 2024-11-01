@@ -2,8 +2,20 @@
 //! Eventually actually replicating sed became to hard, so now
 //! I'm just using tuples of regex patterns
 
+use std::path::PathBuf;
+
+use bon::Builder;
+use getset::Getters;
 use regex::Regex;
 use thiserror::Error;
+
+#[derive(thiserror::Error, Debug, Builder, Getters)]
+#[error("{path} does not contain the ngram {ngram}")]
+#[getset(get = "pub")]
+pub struct MissingSubstringError {
+    path: PathBuf,
+    ngram: String,
+}
 
 #[derive(Error, Debug)]
 pub enum ReplacePairError {

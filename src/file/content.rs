@@ -1,3 +1,3 @@
 pub mod body;
-pub mod frontmatter;
+pub mod front_matter;
 pub mod lists;

@@ -9,5 +9,14 @@ fn main() -> Result<()> {
     // Load the configuration
     let config = config::Config::new().map_err(|e| miette!(e))?;
 
-    lib(&config)
+    match lib(&config) {
+        Err(e) => Err(e),
+        Ok(e) => {
+            if e.is_empty() {
+                Ok(())
+            } else {
+                Err(miette!(e))
+            }
+        }
+    }
 }

@@ -1,1 +1,2 @@
-mod similar_filenames;
+mod broken_wikilink;
+mod similar_filename;

@@ -1,3 +1,4 @@
+//! yaml uses:
 //! ---
 //! name: value
 //! ---

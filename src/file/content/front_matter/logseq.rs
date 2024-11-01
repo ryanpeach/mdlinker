@@ -1,4 +1,4 @@
-//! Logseq uses
+//! logseq uses:
 //! <name>:: csv
 
 use serde::{Deserialize, Serialize};
