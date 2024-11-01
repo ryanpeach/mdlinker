@@ -10,7 +10,7 @@ pub struct FrontMatter {
 }
 
 impl FrontMatter {
-    pub fn new(contents: &str) -> Result<Self, Error> {
+    pub(super) fn new(contents: &str) -> Result<Self, Error> {
         // Try to parse as YAML
         let out = yaml::Config::new(contents)?;
         if !out.is_empty() {

@@ -32,6 +32,8 @@ pub struct Config {
     ngram_size: usize,
     #[builder(default=r"\s".to_owned())]
     boundary_pattern: String,
+    #[builder(default=r"\[\[\*]]|#\b[\w_]+\b|#\[\[.*?]]".to_owned())]
+    wikilink_pattern: String,
     #[builder(default=r"___|__|-|_|\s".to_owned())]
     filename_spacing_pattern: String,
     #[builder(default = 2)]
@@ -59,6 +61,7 @@ pub trait Partial {
     fn directories(&self) -> Option<Vec<PathBuf>>;
     fn ngram_size(&self) -> Option<usize>;
     fn boundary_pattern(&self) -> Option<String>;
+    fn wikilink_pattern(&self) -> Option<String>;
     fn filename_spacing_pattern(&self) -> Option<String>;
     fn filename_match_threshold(&self) -> Option<i64>;
     fn exclude(&self) -> Option<Vec<String>>;
@@ -76,6 +79,7 @@ fn combine_partials(partials: &[&dyn Partial]) -> Config {
         .maybe_directories(partials.iter().find_map(|p| p.directories()))
         .maybe_ngram_size(partials.iter().find_map(|p| p.ngram_size()))
         .maybe_boundary_pattern(partials.iter().find_map(|p| p.boundary_pattern()))
+        .maybe_wikilink_pattern(partials.iter().find_map(|p| p.wikilink_pattern()))
         .maybe_filename_spacing_pattern(partials.iter().find_map(|p| p.filename_spacing_pattern()))
         .maybe_filename_match_threshold(partials.iter().find_map(|p| p.filename_match_threshold()))
         .maybe_exclude(partials.iter().find_map(|p| p.exclude()))

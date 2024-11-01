@@ -46,6 +46,9 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
     let boundary_regex = regex::Regex::new(config.boundary_pattern()).map_err(|e| miette!(e))?;
     let filename_spacing_regex =
         regex::Regex::new(config.filename_spacing_pattern()).map_err(|e| miette!(e))?;
+    // We need to test for this ahead of time due to caching reasons, and its just nice to put all
+    // the regex errors next to each other
+    let _wikilink_regex = regex::Regex::new(config.wikilink_pattern()).map_err(|e| miette!(e))?;
 
     let file_ngrams = ngrams(
         config.directories().clone(),
@@ -62,20 +65,22 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
             .filter_by_excludes(config.exclude().clone())
             .dedupe_by_code();
 
-    let duplicate_aliases = DuplicateAlias::calculate(get_files(config.directories().clone()))
-        .map_err(|e| miette!(e))?
-        .filter_by_excludes(config.exclude().clone())
-        .dedupe_by_code();
+    let duplicate_aliases =
+        DuplicateAlias::calculate(get_files(config.directories().clone()), config)
+            .map_err(|e| miette!(e))?
+            .filter_by_excludes(config.exclude().clone())
+            .dedupe_by_code();
 
     // Unfortunately we can't continue if we have duplicate aliases
     if !duplicate_aliases.is_empty() {
         return Err(miette!("Duplicate aliases found"));
     }
 
-    let broken_wikilinks = BrokenWikilink::calculate(get_files(config.directories().clone()))
-        .map_err(|e| miette!(e))?
-        .filter_by_excludes(config.exclude().clone())
-        .dedupe_by_code();
+    let broken_wikilinks =
+        BrokenWikilink::calculate(get_files(config.directories().clone()), config)
+            .map_err(|e| miette!(e))?
+            .filter_by_excludes(config.exclude().clone())
+            .dedupe_by_code();
 
     // Return
     Ok(OutputReport::builder()
