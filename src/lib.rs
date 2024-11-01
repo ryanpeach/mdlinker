@@ -1,57 +1,91 @@
 pub mod config;
-pub mod error;
 pub mod file;
 pub mod ngrams;
+pub mod rules;
 pub mod sed;
 
-use file::name::SimilarFilenames;
+use bon::Builder;
+use file::{get_files, name::ngrams};
 use miette::{miette, Diagnostic, Result};
+use rules::{
+    broken_wikilink::BrokenWikilink, duplicate_alias::DuplicateAlias,
+    similar_filename::SimilarFilename,
+};
 
-use crate::error::VecHasIdExtensions;
+use crate::rules::VecHasCodeExtensions;
 use thiserror::Error;
 
 /// A miette diagnostic that controls the printout of errors to the user
 /// Put a vector of all outputs in a new field with a #[related] macro above it
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Debug, Error, Diagnostic, Builder)]
 #[error("Output Report")]
-struct OutputReport {
+pub struct OutputReport {
     #[related]
-    similar_filenames: Vec<SimilarFilenames>,
+    pub similar_filenames: Vec<SimilarFilename>,
+    #[related]
+    pub duplicate_aliases: Vec<DuplicateAlias>,
+    #[related]
+    pub broken_wikilinks: Vec<BrokenWikilink>,
 }
 
 impl OutputReport {
-    /// Create a new output report
-    pub fn new(similar_filenames: Vec<SimilarFilenames>) -> Self {
-        Self { similar_filenames }
+    /// Get if this is empty
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.similar_filenames.is_empty() && self.broken_wikilinks.is_empty()
     }
 }
 
 /// The main library function that takes a configuration and returns a Result
 /// Comparable to running as an executable
-pub fn lib(config: &config::Config) -> Result<()> {
+///
+/// # Errors
+///
+/// Even though this returns a Result, its `Ok()` type is also a mieette error IFF .`is_empty()` == false
+/// The `Err()` type is a non-linter defined error, like a parsing error or regex error
+///
+/// Basically if this library fails, this returns an Err
+/// but if this library runs, even if it finds linting violations, this returns an Ok
+pub fn lib(config: &config::Config) -> Result<OutputReport> {
     // Compile our regex patterns
     let boundary_regex = regex::Regex::new(config.boundary_pattern()).map_err(|e| miette!(e))?;
     let filename_spacing_regex =
         regex::Regex::new(config.filename_spacing_pattern()).map_err(|e| miette!(e))?;
 
-    let file_ngrams = file::name::ngrams(
+    let file_ngrams = ngrams(
         config.directories().clone(),
         *config.ngram_size(),
         &boundary_regex,
         &filename_spacing_regex,
     );
 
-    // Calculate the similarity between filenames
-    let matches = SimilarFilenames::calculate(&file_ngrams, *config.filename_match_threshold())
+    // All our reports
+    // NOTE: Always use `filter_by_excludes` and `dedupe_by_code` on the reports
+    let similar_filenames =
+        SimilarFilename::calculate(&file_ngrams, *config.filename_match_threshold())
+            .map_err(|e| miette!(e))?
+            .filter_by_excludes(config.exclude().clone())
+            .dedupe_by_code();
+
+    let duplicate_aliases = DuplicateAlias::calculate(get_files(config.directories().clone()))
         .map_err(|e| miette!(e))?
         .filter_by_excludes(config.exclude().clone())
-        .dedupe_by_id();
+        .dedupe_by_code();
+
+    // Unfortunately we can't continue if we have duplicate aliases
+    if !duplicate_aliases.is_empty() {
+        return Err(miette!("Duplicate aliases found"));
+    }
+
+    let broken_wikilinks = BrokenWikilink::calculate(get_files(config.directories().clone()))
+        .map_err(|e| miette!(e))?
+        .filter_by_excludes(config.exclude().clone())
+        .dedupe_by_code();
 
     // Return
-    if matches.is_empty() {
-        Ok(())
-    } else {
-        log::error!("Found {} similar filenames", matches.len());
-        Err(OutputReport::new(matches).into())
-    }
+    Ok(OutputReport::builder()
+        .similar_filenames(similar_filenames)
+        .duplicate_aliases(duplicate_aliases)
+        .broken_wikilinks(broken_wikilinks)
+        .build())
 }
