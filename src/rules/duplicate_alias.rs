@@ -1,44 +1,73 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use bon::Builder;
 use miette::{miette, Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
 use thiserror::Error;
 
-use crate::{file::content::from_file, sed::MissingSubstringError};
+use crate::{
+    file::{content::from_file, name::get_filename},
+    sed::MissingSubstringError,
+};
 
-use super::HasCode;
+use super::HasId;
 
 pub const CODE: &str = "name::alias::duplicate";
 
-#[derive(Error, Debug, Diagnostic, Builder)]
+#[derive(Error, Debug, Diagnostic)]
 #[error("A wikilink does not have a corresponding page")]
 #[diagnostic(code(CODE))]
-pub struct DuplicateAlias {
-    /// Used to identify the diagnostic and exclude it if needed
-    code: String,
+pub enum DuplicateAlias {
+    FileNameContentDuplicate {
+        /// Used to identify the diagnostic and exclude it if needed
+        id: String,
 
-    #[source_code]
-    filepaths: NamedSource<String>,
+        /// The filename the alias contradicts with
+        other_filename: String,
 
-    #[label("This bit here")]
-    instance1: SourceSpan,
+        /// The content of the file with the alias
+        #[source_code]
+        src: NamedSource<String>,
 
-    #[label("That bit there")]
-    instance2: SourceSpan,
+        /// The alias span in the content of the file with the alias
+        #[label("Contradicts with {other_filename}")]
+        alias: SourceSpan,
 
-    #[help]
-    advice: String,
+        /// Just some advice
+        #[help]
+        advice: String,
+    },
+    FileContentContentDuplicate {
+        /// Used to identify the diagnostic and exclude it if needed
+        id: String,
+
+        /// The filename which contains the other duplicate alias
+        other_filename: String,
+
+        /// The content of the file with the alias
+        #[source_code]
+        src: NamedSource<String>,
+
+        /// The alias span in the content of the file with the
+        #[label("Contradicts with aliases within {other_filename}")]
+        alias: SourceSpan,
+
+        /// Put an exact copy but using the other file in src
+        #[related]
+        other: Vec<Self>,
+    },
+}
+
+impl HasId for DuplicateAlias {
+    fn id(&self) -> String {
+        match self {
+            DuplicateAlias::FileNameContentDuplicate { id: code, .. }
+            | DuplicateAlias::FileContentContentDuplicate { id: code, .. } => code.clone(),
+        }
+    }
 }
 
 impl PartialEq for DuplicateAlias {
     fn eq(&self, other: &Self) -> bool {
-        self.code == other.code
-    }
-}
-
-impl HasCode for DuplicateAlias {
-    fn code(&self) -> String {
-        self.code.clone()
+        self.id() == other.id()
     }
 }
 
@@ -55,25 +84,10 @@ impl DuplicateAlias {
         // Create the unique id
         let id = format!("{CODE}::{alias}");
 
-        if file1_path.to_string_lossy().contains(alias) {
+        if get_filename(file1_path) == alias {
             let file2_content =
                 std::fs::read_to_string(file2_path).expect("File reported as existing");
-            // Assemble the source
-            let source = format!(
-                "{}\n```{}\n{}\n```",
-                file1_path.to_string_lossy(),
-                file2_path.to_string_lossy(),
-                file2_content
-            );
-            let filepaths = NamedSource::new("Filepaths", source);
-
             // Find the alias
-            let file1_path_found = file1_path.to_string_lossy().find(alias).ok_or_else(|| {
-                MissingSubstringError::builder()
-                    .path(file1_path.clone())
-                    .ngram(alias.to_string())
-                    .build()
-            })?;
             let file2_content_found = file2_content.find(alias).ok_or_else(|| {
                 MissingSubstringError::builder()
                     .path(file2_path.clone())
@@ -82,27 +96,17 @@ impl DuplicateAlias {
             })?;
 
             // Generate the spans relative to the NamedSource
-            let file1_path_span =
-                SourceSpan::new(SourceOffset::from(file1_path_found), alias.len());
-            let file2_content_span = SourceSpan::new(
-                SourceOffset::from(
-                    file1_path.to_string_lossy().len()
-                        + 4
-                        + file2_path.to_string_lossy().len()
-                        + 1
-                        + file2_content_found,
-                ),
-                alias.len(),
-            );
+            let file2_content_span =
+                SourceSpan::new(SourceOffset::from(file2_content_found), alias.len());
 
-            Ok(DuplicateAlias::builder()
-                .code(id)
-                .filepaths(filepaths)
-                .instance1(file1_path_span)
-                .instance2(file2_content_span)
-                .advice("Check the files for duplicate aliases".to_string())
-                .build())
-        } else if file2_path.to_string_lossy().contains(alias) {
+            Ok(DuplicateAlias::FileNameContentDuplicate {
+                id,
+                other_filename: get_filename(file1_path),
+                src: NamedSource::new(file2_path.to_string_lossy(), file2_content),
+                alias: file2_content_span,
+                advice: format!("Delete the alias from {}", file2_path.to_string_lossy()),
+            })
+        } else if get_filename(file2_path) == alias {
             // This is the same as above just with path 1 and 2 flipped
             Self::new(alias, file2_path, file1_path)
         } else {
@@ -110,16 +114,6 @@ impl DuplicateAlias {
                 std::fs::read_to_string(file1_path).expect("File reported as existing");
             let file2_content =
                 std::fs::read_to_string(file2_path).expect("File reported as existing");
-
-            // Assemble the source
-            let source = format!(
-                "```{}\n{}\n```\n```{}\n{}\n```",
-                file1_path.to_string_lossy(),
-                file1_content,
-                file2_path.to_string_lossy(),
-                file2_content
-            );
-            let filepaths = NamedSource::new("Filepaths", source);
 
             // Find the alias
             let file1_content_found = file1_content.find(alias).ok_or_else(|| {
@@ -136,33 +130,24 @@ impl DuplicateAlias {
             })?;
 
             // Generate the spans relative to the NamedSource
-            let file1_content_span = SourceSpan::new(
-                SourceOffset::from(
-                    3 + file1_path.to_string_lossy().len() + 1 + file1_content_found,
-                ),
-                alias.len(),
-            );
-            let file2_content_span = SourceSpan::new(
-                SourceOffset::from(
-                    3 + file1_path.to_string_lossy().len()
-                        + 1
-                        + file1_content.len()
-                        + 4
-                        + 3
-                        + file2_path.to_string_lossy().len()
-                        + 1
-                        + file2_content_found,
-                ),
-                alias.len(),
-            );
+            let file1_content_span =
+                SourceSpan::new(SourceOffset::from(file1_content_found), alias.len());
+            let file2_content_span =
+                SourceSpan::new(SourceOffset::from(file2_content_found), alias.len());
 
-            Ok(DuplicateAlias::builder()
-                .code(id)
-                .filepaths(filepaths)
-                .instance1(file1_content_span)
-                .instance2(file2_content_span)
-                .advice("Check the files for duplicate aliases".to_string())
-                .build())
+            Ok(DuplicateAlias::FileContentContentDuplicate {
+                id: id.clone(),
+                other_filename: file2_path.to_string_lossy().to_string(),
+                src: NamedSource::new(file1_path.to_string_lossy(), file1_content),
+                alias: file1_content_span,
+                other: vec![DuplicateAlias::FileContentContentDuplicate {
+                    id,
+                    other_filename: file1_path.to_string_lossy().to_string(),
+                    src: NamedSource::new(file2_path.to_string_lossy(), file2_content),
+                    alias: file2_content_span,
+                    other: vec![],
+                }],
+            })
         }
     }
 

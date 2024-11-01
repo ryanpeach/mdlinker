@@ -1,6 +1,6 @@
 use mdlinker::rules::duplicate_alias;
 
-use mdlinker::rules::VecHasCodeExtensions;
+use mdlinker::rules::VecHasIdExtensions;
 
 use crate::common::get_report;
 

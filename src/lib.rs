@@ -6,25 +6,20 @@ pub mod sed;
 
 use bon::Builder;
 use file::{get_files, name::ngrams};
-use miette::{miette, Diagnostic, Result};
+use miette::{miette, Result};
 use rules::{
     broken_wikilink::BrokenWikilink, duplicate_alias::DuplicateAlias,
     similar_filename::SimilarFilename,
 };
 
-use crate::rules::VecHasCodeExtensions;
-use thiserror::Error;
+use crate::rules::VecHasIdExtensions;
 
 /// A miette diagnostic that controls the printout of errors to the user
 /// Put a vector of all outputs in a new field with a #[related] macro above it
-#[derive(Debug, Error, Diagnostic, Builder)]
-#[error("Output Report")]
+#[derive(Debug, Builder)]
 pub struct OutputReport {
-    #[related]
     pub similar_filenames: Vec<SimilarFilename>,
-    #[related]
     pub duplicate_aliases: Vec<DuplicateAlias>,
-    #[related]
     pub broken_wikilinks: Vec<BrokenWikilink>,
 }
 

@@ -1,6 +1,6 @@
 use mdlinker::rules::broken_wikilink;
 
-use mdlinker::rules::VecHasCodeExtensions;
+use mdlinker::rules::VecHasIdExtensions;
 
 use crate::common::get_report;
 

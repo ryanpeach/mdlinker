@@ -5,16 +5,16 @@
 //!   [`thiserror::Error`]
 //!   and [`miette::Diagnostic`] inside [`crate::rules`]
 //! * A Report is the result of a rule, like "These two filenames are similar".
-//!   Reports all implement [`crate::rules::HasCode`].
+//!   Reports all implement [`crate::rules::HasId`].
 
 /// All reports should have a code that can be human readable
 /// Codes's should also be useful to deduplicate errors before presenting them to the user
-pub trait HasCode {
-    fn code(&self) -> String;
+pub trait HasId {
+    fn id(&self) -> String;
 }
 
-/// Implemented for all vectors of items that implement [`HasCode`]
-pub trait VecHasCodeExtensions<T> {
+/// Implemented for all vectors of items that implement [`HasId`]
+pub trait VecHasIdExtensions<T> {
     #[must_use]
     fn filter_by_excludes(self, excludes: Vec<String>) -> Self;
     #[must_use]
@@ -24,11 +24,11 @@ pub trait VecHasCodeExtensions<T> {
 }
 
 /// Used for filtering out items that start with the exclude code
-impl<T: HasCode> VecHasCodeExtensions<T> for Vec<T> {
+impl<T: HasId> VecHasIdExtensions<T> for Vec<T> {
     fn filter_by_excludes(mut self, excludes: Vec<String>) -> Self {
         self.retain(|item| {
             !excludes.iter().any(|exclude| {
-                item.code()
+                item.id()
                     .to_lowercase()
                     .starts_with(&exclude.to_lowercase())
             })
@@ -37,12 +37,12 @@ impl<T: HasCode> VecHasCodeExtensions<T> for Vec<T> {
     }
 
     fn dedupe_by_code(mut self) -> Self {
-        self.dedup_by(|a, b| a.code().to_lowercase() == b.code().to_lowercase());
+        self.dedup_by(|a, b| a.id().to_lowercase() == b.id().to_lowercase());
         self
     }
 
     fn contains_code(&self, code: &str) -> Vec<&T> {
-        self.iter().filter(|item| item.code() == code).collect()
+        self.iter().filter(|item| item.id() == code).collect()
     }
 }
 
