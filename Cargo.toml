@@ -35,6 +35,9 @@ iai-callgrind = "0.14.0"
 name    = "bench_main"
 harness = false
 
+[[test]]
+name = "logseq"
+
 [profile.bench]
 debug = true
 
