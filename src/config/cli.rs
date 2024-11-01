@@ -27,6 +27,10 @@ pub(super) struct Config {
     #[clap(short = 'b', long = "bound")]
     pub boundary_pattern: Option<String>,
 
+    /// Regex pattern for wikilinks
+    #[clap(short = 'w', long = "wikilink")]
+    pub wikilink_pattern: Option<String>,
+
     /// Regex pattern to split filenames on, like _ or -")
     #[clap(short = 's', long = "space")]
     pub filename_spacing_pattern: Option<String>,
@@ -55,6 +59,9 @@ impl Partial for Config {
     }
     fn boundary_pattern(&self) -> Option<String> {
         self.boundary_pattern.clone()
+    }
+    fn wikilink_pattern(&self) -> Option<String> {
+        self.wikilink_pattern.clone()
     }
     fn filename_spacing_pattern(&self) -> Option<String> {
         self.filename_spacing_pattern.clone()

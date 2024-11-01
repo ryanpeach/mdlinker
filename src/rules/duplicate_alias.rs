@@ -4,6 +4,7 @@ use miette::{miette, Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
 use thiserror::Error;
 
 use crate::{
+    config::Config,
     file::{content::from_file, name::get_filename},
     sed::MissingSubstringError,
 };
@@ -151,14 +152,16 @@ impl DuplicateAlias {
         }
     }
 
-    pub fn calculate(files: Vec<PathBuf>) -> Result<Vec<DuplicateAlias>> {
+    pub fn calculate(files: Vec<PathBuf>, config: &Config) -> Result<Vec<DuplicateAlias>> {
         // First we need to collect all the file names and and aliases and collect a lookup table
         // relating the string and the path to the file
         // We may hit a duplicate alias, if so we need to collect all of them and stop
         let mut lookup_table = HashMap::<String, PathBuf>::new();
         let mut duplicates: Vec<DuplicateAlias> = Vec::new();
         for file_path in files {
-            let front_matter = from_file(file_path.clone()).map_err(|e| miette!(e))?;
+            let front_matter = from_file(file_path.clone(), config.wikilink_pattern().clone())
+                .map_err(|e| miette!(e))?
+                .front_matter;
             for alias in front_matter.aliases {
                 if let Some(out) = lookup_table.insert(alias.clone(), file_path.clone()) {
                     duplicates.push(

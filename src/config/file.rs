@@ -22,6 +22,10 @@ pub(super) struct Config {
     #[serde(default)]
     pub boundary_pattern: Option<String>,
 
+    /// Regex pattern for wikilinks
+    #[serde(default)]
+    pub wikilink_pattern: Option<String>,
+
     /// Regex pattern to split filenames on, like _ or -")
     #[serde(default)]
     pub filename_spacing_pattern: Option<String>,
@@ -73,6 +77,10 @@ impl Partial for Config {
 
     fn boundary_pattern(&self) -> Option<String> {
         self.boundary_pattern.clone()
+    }
+
+    fn wikilink_pattern(&self) -> Option<String> {
+        self.wikilink_pattern.clone()
     }
 
     fn filename_spacing_pattern(&self) -> Option<String> {
