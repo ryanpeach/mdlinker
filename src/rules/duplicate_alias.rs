@@ -51,6 +51,7 @@ impl DuplicateAlias {
         file1_path: &PathBuf,
         file2_path: &PathBuf,
     ) -> Result<Self, MissingSubstringError> {
+        assert_ne!(file1_path, file2_path);
         // Create the unique id
         let id = format!("{CODE}::{alias}");
 
