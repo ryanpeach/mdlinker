@@ -1,8 +1,9 @@
-use crate::{file::name::get_filename, rules::HasId, sed::MissingSubstringError};
+use crate::{file::name::get_filename, ngrams::Ngram, rules::HasId, sed::MissingSubstringError};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use indicatif::ProgressBar;
 use miette::{Diagnostic, SourceOffset, SourceSpan};
+use regex::Regex;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -46,34 +47,39 @@ impl SimilarFilename {
     ///
     pub fn new(
         file1_path: &Path,
-        file1_ngram: &str,
+        file1_ngram: &Ngram,
         file2_path: &Path,
-        file2_ngram: &str,
+        file2_ngram: &Ngram,
+        spacing_regex: &Regex,
         score: i64,
     ) -> Result<Self, MissingSubstringError> {
         // file paths as strings
         let file1 = file1_path.to_string_lossy().to_lowercase();
         let file2 = file2_path.to_string_lossy().to_lowercase();
-        let file1_ngram = file1_ngram.to_lowercase();
-        let file2_ngram = file2_ngram.to_lowercase();
 
         // Assemble the source
         let source = format!("{file1}\n{file2}");
         let filepaths = source.clone();
 
         // Find the ngrams in each filepath
-        let find1 = file1.find(&file1_ngram).ok_or_else(|| {
-            MissingSubstringError::builder()
-                .path(file1_path.to_path_buf())
-                .ngram(file1_ngram.to_string())
-                .build()
-        })?;
-        let find2 = file2.find(&file2_ngram).ok_or_else(|| {
-            MissingSubstringError::builder()
-                .path(file2_path.to_path_buf())
-                .ngram(file2_ngram.to_string())
-                .build()
-        })?;
+        let find1 = spacing_regex
+            .replace_all(&file1, " ")
+            .find(&file1_ngram.to_string())
+            .ok_or_else(|| {
+                MissingSubstringError::builder()
+                    .path(file1_path.to_path_buf())
+                    .ngram(file1_ngram.to_string())
+                    .build()
+            })?;
+        let find2 = spacing_regex
+            .replace_all(&file2, " ")
+            .find(&file2_ngram.to_string())
+            .ok_or_else(|| {
+                MissingSubstringError::builder()
+                    .path(file2_path.to_path_buf())
+                    .ngram(file2_ngram.to_string())
+                    .build()
+            })?;
 
         // Create the spans
         let file1_ngram = SourceSpan::new(
@@ -111,8 +117,9 @@ impl SimilarFilename {
     }
 
     pub fn calculate(
-        file_ngrams: &std::collections::HashMap<String, PathBuf>,
+        file_ngrams: &std::collections::HashMap<Ngram, PathBuf>,
         filename_match_threshold: i64,
+        spacing_regex: &Regex,
     ) -> Result<Vec<SimilarFilename>, MissingSubstringError> {
         // Convert all filenames to a single string
         // Check if any two file ngrams fuzzy match
@@ -155,6 +162,7 @@ impl SimilarFilename {
                             ngram,
                             other_filepath,
                             other_ngram,
+                            spacing_regex,
                             score,
                         )?);
                         break;
