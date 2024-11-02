@@ -1,6 +1,6 @@
 use mdlinker::config;
 use mdlinker::lib;
-use miette::{miette, Result};
+use miette::{miette, Report, Result};
 
 /// Really just a wrapper that loads the config and passes it to the main library function
 fn main() -> Result<()> {
@@ -13,17 +13,18 @@ fn main() -> Result<()> {
     match lib(&config) {
         Err(e) => Err(e)?,
         Ok(e) => {
+            println!();
             for error in e.similar_filenames {
                 nb_errors += 1;
-                log::error!("{}", miette!(error));
+                eprintln!("{:?}", Report::from(error));
             }
             for error in e.duplicate_aliases {
                 nb_errors += 1;
-                log::error!("{}", miette!(error));
+                eprintln!("{:?}", Report::from(error));
             }
             for error in e.broken_wikilinks {
                 nb_errors += 1;
-                log::error!("{}", miette!(error));
+                eprintln!("{:?}", Report::from(error));
             }
         }
     }
