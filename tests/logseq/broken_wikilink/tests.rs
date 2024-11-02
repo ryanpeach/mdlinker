@@ -63,12 +63,12 @@ fn dolor_does_not_exist_and_is_not_wikilink() {
 /// This passes because the link is valid
 /// This is also a tag so testing that tags work
 #[test]
-fn sit_does_not_exist_and_is_tag() {
+fn sit_exists_and_is_tag() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
         println!("{broken_wikilink:?}");
     }
-    assert!(!report
+    assert!(report
         .broken_wikilinks
         .contains_code(&format!("{}::2024_11_01::sit", broken_wikilink::CODE))
         .is_empty());

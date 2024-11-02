@@ -21,12 +21,8 @@ pub struct MissingSubstringError {
 pub enum RegexError {
     #[error("The pattern is not a valid regex")]
     CompileError(regex::Error),
-    #[error("Nothing was captured in position {pos} for the regex {pattern} matching {mat}")]
-    CaptureError {
-        pos: usize,
-        pattern: String,
-        mat: String,
-    },
+    #[error("Nothing extra was captured for the regex {pattern} matching {mat}")]
+    CaptureError { pattern: String, mat: String },
 }
 
 #[derive(Error, Debug)]
