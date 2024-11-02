@@ -11,7 +11,7 @@ pub const CODE: &str = "name::similar";
 
 #[derive(Error, Debug, Diagnostic)]
 #[error("Filenames are similar")]
-#[diagnostic(code(CODE))]
+#[diagnostic(code("name::similar"))]
 pub struct SimilarFilename {
     /// Used to identify the diagnostic and exclude it if needed
     id: String,
