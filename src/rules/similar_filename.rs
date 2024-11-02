@@ -52,8 +52,8 @@ impl SimilarFilename {
         score: i64,
     ) -> Result<Self, MissingSubstringError> {
         // file paths as strings
-        let file1 = file1_path.to_string_lossy();
-        let file2 = file2_path.to_string_lossy();
+        let file1 = file1_path.to_string_lossy().to_lowercase();
+        let file2 = file2_path.to_string_lossy().to_lowercase();
 
         // Assemble the source
         let source = format!("{file1}\n{file2}");
