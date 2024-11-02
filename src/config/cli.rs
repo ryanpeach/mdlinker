@@ -34,6 +34,7 @@ pub(super) struct Config {
     pub boundary_pattern: Option<String>,
 
     /// Regex pattern for wikilinks
+    /// Capture group 0 is skipped to enable lookbehind
     #[clap(short = 'w', long = "wikilink")]
     pub wikilink_pattern: Option<String>,
 
