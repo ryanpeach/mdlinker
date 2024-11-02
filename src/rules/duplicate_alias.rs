@@ -48,7 +48,7 @@ pub enum DuplicateAlias {
         src: NamedSource<String>,
 
         /// The alias span in the content of the file with the
-        #[label("Contradicts with aliases within {other_filename}")]
+        #[label("Contradicts with aliases within '{other_filename}' (case insensitive)")]
         alias: SourceSpan,
 
         /// Put an exact copy but using the other file in src
