@@ -8,34 +8,31 @@ use super::{Error, Partial};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub(super) struct Config {
-    /// The directories to search in
-    /// May provide more than one directory
+    /// See [`super::cli::Config::directories`]
     #[serde(default)]
     pub directories: Vec<PathBuf>,
 
-    /// Size of the n-grams to generate from filenames
-    /// Will generate n-grams UP TO and INCLUDING this size
+    /// See [`super::cli::Config::ngram_size`]
     #[serde(default)]
     pub ngram_size: Option<usize>,
 
-    /// Regex pattern to stop n-gram generation on, like , or .")
+    /// See [`super::cli::Config::boundary_pattern`]
     #[serde(default)]
     pub boundary_pattern: Option<String>,
 
-    /// Regex pattern for wikilinks
+    /// See [`super::cli::Config::wikilink_pattern`]
     #[serde(default)]
     pub wikilink_pattern: Option<String>,
 
-    /// Regex pattern to split filenames on, like _ or -")
+    /// See [`super::cli::Config::filename_spacing_pattern`]
     #[serde(default)]
     pub filename_spacing_pattern: Option<String>,
 
-    /// The minimum score to consider a match for filename ngrams
+    /// See [`super::cli::Config::filename_match_threshold`]
     #[serde(default)]
     pub filename_match_threshold: Option<i64>,
 
-    /// Exclude certain error codes
-    /// If an error code **starts with** this string, it will be excluded
+    /// See [`super::cli::Config::exclude`]
     #[serde(default)]
     pub exclude: Vec<String>,
 

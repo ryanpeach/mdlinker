@@ -26,25 +26,34 @@ pub enum Error {
 #[derive(Getters, Builder)]
 #[getset(get = "pub")]
 pub struct Config {
+    /// See [`self::cli::Config::directories`]
     #[builder(default=vec![PathBuf::from(".")])]
     directories: Vec<PathBuf>,
+    /// See [`self::cli::Config::ngram_size`]
     #[builder(default = 2)]
     ngram_size: usize,
+    /// See [`self::cli::Config::boundary_pattern`]
     #[builder(default=r"\s".to_owned())]
     boundary_pattern: String,
+    /// See [`self::cli::Config::wikilink_pattern`]
     #[builder(default=r"#?\[\[(.*?)]]|#([A-Za-z0-9_]+)".to_owned())]
     wikilink_pattern: String,
+    /// See [`self::cli::Config::filename_spacing_pattern`]
     #[builder(default=r"___|__|-|_|\s".to_owned())]
     filename_spacing_pattern: String,
+    /// See [`self::cli::Config::filename_match_threshold`]
     #[builder(default = 2)]
     filename_match_threshold: i64,
+    /// See [`self::cli::Config::exclude`]
     #[builder(default=vec![])]
     exclude: Vec<String>,
+    /// See [`self::file::Config::title_to_filepath`]
     #[builder(default=Ok(vec![vec![
         ReplacePair::new(r"([A-Za-z0-1_-]+).md", r"\[\[$1\]\]").expect("Constant"),
         ReplacePair::new(r"___", r"/").expect("Constant"),
     ]]))]
     filepath_to_title: Result<Vec<Vec<ReplacePair>>, ReplacePairError>,
+    /// See [`self::file::Config::title_to_filepath`]
     #[builder(default=Ok(vec![vec![
         ReplacePair::new(r"\[\[(.*?)\]\]", r"$1.md").expect("Constant"),
         ReplacePair::new(r"/", r"___").expect("Constant"),

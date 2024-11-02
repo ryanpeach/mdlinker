@@ -23,7 +23,7 @@ pub(super) struct Config {
     #[clap(short = 'n', long = "ngram")]
     pub ngram_size: Option<usize>,
 
-    /// Regex pattern to stop n-gram generation on, like , or .")
+    /// Regex pattern to stop n-gram generation on, like , or .
     #[clap(short = 'b', long = "bound")]
     pub boundary_pattern: Option<String>,
 
@@ -31,7 +31,7 @@ pub(super) struct Config {
     #[clap(short = 'w', long = "wikilink")]
     pub wikilink_pattern: Option<String>,
 
-    /// Regex pattern to split filenames on, like _ or -")
+    /// Regex pattern to split filenames on, like ___ or /
     #[clap(short = 's', long = "space")]
     pub filename_spacing_pattern: Option<String>,
 
