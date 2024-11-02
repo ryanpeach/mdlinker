@@ -19,7 +19,7 @@ pub const CODE: &str = "name::alias::duplicate";
 
 #[derive(Error, Debug, Diagnostic)]
 #[error("A wikilink does not have a corresponding page")]
-#[diagnostic(code(CODE))]
+#[diagnostic(code("name::alias::duplicate"))]
 pub enum DuplicateAlias {
     FileNameContentDuplicate {
         /// Used to identify the diagnostic and exclude it if needed

@@ -16,7 +16,7 @@ pub const CODE: &str = "content::wikilink::broken";
 
 #[derive(Error, Debug, Diagnostic, Builder)]
 #[error("A wikilink does not have a corresponding page")]
-#[diagnostic(code(CODE))]
+#[diagnostic(code("content::wikilink::broken"))]
 pub struct BrokenWikilink {
     /// Used to identify the diagnostic and exclude it if needed
     id: String,
