@@ -46,7 +46,7 @@ pub struct Config {
     #[builder(default=r"-|_|\s".to_owned())]
     pub filename_spacing_pattern: String,
     /// See [`self::cli::Config::filename_match_threshold`]
-    #[builder(default = 100)]
+    #[builder(default = 95)]
     pub filename_match_threshold: i64,
     /// See [`self::cli::Config::exclude`]
     #[builder(default=vec![])]

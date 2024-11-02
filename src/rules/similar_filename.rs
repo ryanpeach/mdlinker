@@ -16,6 +16,8 @@ pub struct SimilarFilename {
     /// Used to identify the diagnostic and exclude it if needed
     id: String,
 
+    score: i64,
+
     #[source_code]
     filepaths: String,
 
@@ -27,6 +29,12 @@ pub struct SimilarFilename {
 
     #[help]
     advice: String,
+}
+
+impl PartialOrd for SimilarFilename {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.score.partial_cmp(&other.score)
+    }
 }
 
 impl PartialEq for SimilarFilename {
@@ -109,6 +117,7 @@ impl SimilarFilename {
         );
         Ok(Self {
             id,
+            score,
             filepaths,
             file1_ngram,
             file2_ngram,
@@ -134,6 +143,10 @@ impl SimilarFilename {
         for (i, (ngram, filepath)) in file_ngrams.clone().iter().enumerate() {
             // We can start at i + 1 because we've already checked all previous files
             for (other_ngram, other_filepath) in file_ngrams.iter().skip(i + 1) {
+                if ngram.nb_words() != other_ngram.nb_words() {
+                    continue;
+                }
+
                 file_crosscheck_bar.inc(1);
 
                 // Skip if the same file

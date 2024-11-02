@@ -56,14 +56,16 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
 
     // All our reports
     // NOTE: Always use `filter_by_excludes` and `dedupe_by_code` on the reports
-    let similar_filenames = SimilarFilename::calculate(
+    let mut similar_filenames = SimilarFilename::calculate(
         &file_ngrams,
         config.filename_match_threshold,
         &filename_spacing_regex,
     )
-    .map_err(|e| miette!("From SimilarFilename: {e}"))?
-    .filter_by_excludes(config.exclude.clone())
-    .dedupe_by_code();
+    .map_err(|e| miette!("From SimilarFilename: {e}"))?;
+    similar_filenames.sort_by(|b, a| a.partial_cmp(b).expect("This never fails"));
+    let similar_filenames = similar_filenames
+        .filter_by_excludes(config.exclude.clone())
+        .dedupe_by_code();
 
     let duplicate_aliases =
         DuplicateAlias::calculate(get_files(config.directories.clone()), config)
