@@ -5,7 +5,7 @@ use std::{
 
 use regex::Regex;
 
-use crate::ngrams::up_to_n;
+use crate::{ngrams::up_to_n, sed::ReplacePair};
 
 use super::get_files;
 
@@ -25,11 +25,23 @@ pub fn get_filename(path: &Path) -> String {
         .to_lowercase();
 }
 
+/// Get the filename from a path
+/// Does not include the file extension
+/// Replaces the ___ with / (assuming logseq)
+#[must_use]
+pub fn get_filename_as_alias(
+    path: &Path,
+    filename_spacing_to_group_spacing: &ReplacePair,
+) -> String {
+    let fname = get_filename(path);
+    ReplacePair::apply(filename_spacing_to_group_spacing, &fname)
+}
+
 /// Get the segments of a filename based on [`boundary_regex`]
 #[must_use]
-pub fn filename_segments(path: &Path, boundary_regex: &Regex) -> Vec<String> {
+pub fn filename_segments(path: &Path, filename_spacing_regex: &Regex) -> Vec<String> {
     let filename = get_filename(path);
-    boundary_regex
+    filename_spacing_regex
         .split(&filename)
         .map(std::string::ToString::to_string)
         .collect()
