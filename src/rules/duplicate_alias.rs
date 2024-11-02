@@ -210,7 +210,8 @@ impl DuplicateAlias {
         let mut duplicates: Vec<DuplicateAlias> = Vec::new();
         for file_path in files {
             let filename = get_filename(file_path.as_path());
-            lookup_table.insert(Alias::from_filename(&filename, config)?, file_path.clone());
+            let filename_alias = Alias::from_filename(&filename, config)?;
+            lookup_table.insert(filename_alias, file_path.clone());
             let front_matter =
                 from_file(file_path.clone(), config.wikilink_pattern.clone())?.front_matter;
             for alias in front_matter.aliases {
