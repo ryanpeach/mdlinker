@@ -75,7 +75,9 @@ impl BrokenWikilink {
                                     .to_string(),
                             ))
                             .wikilink(*wikilink.span())
-                            .advice(format!("Create a page for {alias}"))
+                            .advice(format!(
+                                "Create a page or alias for '{alias}' (case insensitive)"
+                            ))
                             .build(),
                     );
                 }
