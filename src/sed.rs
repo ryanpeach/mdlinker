@@ -17,7 +17,7 @@ pub struct MissingSubstringError {
     ngram: String,
 }
 
-#[derive(Error, Debug)]
+#[derive(Clone, Error, Debug)]
 pub enum RegexError {
     #[error("The pattern is not a valid regex")]
     CompileError(regex::Error),
@@ -25,7 +25,7 @@ pub enum RegexError {
     CaptureError { pattern: String, mat: String },
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum ReplacePairError {
     #[error("The 'from' pattern is not a valid regex")]
     FromError(regex::Error),
@@ -34,15 +34,28 @@ pub enum ReplacePairError {
 }
 
 /// A struct that holds a pair of regex patterns
-pub struct ReplacePair {
+#[derive(Clone)]
+pub struct ReplacePair<T, U>
+where
+    T: ToString + From<String>,
+    U: ToString + From<String>,
+{
     /// The pattern to search for
     from: Regex,
     /// The pattern to replace with
     /// Can use capture groups from the 'from' pattern
     to: Regex,
+    /// The type of string coming in
+    _t: std::marker::PhantomData<T>,
+    /// The type of string coming out
+    _u: std::marker::PhantomData<U>,
 }
 
-impl ReplacePair {
+impl<T, U> ReplacePair<T, U>
+where
+    T: ToString + From<String>,
+    U: ToString + From<String>,
+{
     /// Create a new `ReplacePair` from two regex patterns as strings
     /// Will return errors if the patterns are not valid regex
     pub fn new(from: &str, to: &str) -> Result<Self, ReplacePairError> {
@@ -53,12 +66,18 @@ impl ReplacePair {
         Ok(ReplacePair {
             from: from_regex,
             to: to_regex,
+            _t: std::marker::PhantomData,
+            _u: std::marker::PhantomData,
         })
     }
 
     /// Apply replacement to an input string, and return the resultant string
     #[must_use]
-    pub fn apply(&self, input: &str) -> String {
-        self.from.replace_all(input, self.to.as_str()).to_string()
+    pub fn apply(&self, input: &T) -> U {
+        let out = self
+            .from
+            .replace_all(&input.to_string(), self.to.as_str())
+            .to_string();
+        out.into()
     }
 }

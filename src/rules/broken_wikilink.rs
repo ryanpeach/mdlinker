@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use bon::Builder;
-use miette::{miette, Diagnostic, NamedSource, Result, SourceSpan};
+use miette::{Diagnostic, NamedSource, Result, SourceSpan};
 use thiserror::Error;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     rules::duplicate_alias::DuplicateAlias,
 };
 
-use super::HasId;
+use super::{duplicate_alias::CalculateError, HasId};
 
 pub const CODE: &str = "content::wikilink::broken";
 
@@ -44,7 +44,10 @@ impl HasId for BrokenWikilink {
 }
 
 impl BrokenWikilink {
-    pub fn calculate(files: &[PathBuf], config: &Config) -> Result<Vec<BrokenWikilink>> {
+    pub fn calculate(
+        files: &[PathBuf],
+        config: &Config,
+    ) -> Result<Vec<BrokenWikilink>, CalculateError> {
         let (lookup_table, _) =
             DuplicateAlias::get_alias_to_path_table_and_duplicates(files.into(), config)?;
 
@@ -53,16 +56,14 @@ impl BrokenWikilink {
         let mut out = Vec::new();
         for file_path in files {
             let mut file_content = None;
-            let wikilinks = from_file(file_path.clone(), config.wikilink_pattern().clone())
-                .map_err(|e| miette!(e))?
-                .wikilinks;
-            let filename = get_filename(file_path.as_path());
+            let wikilinks =
+                from_file(file_path.clone(), config.wikilink_pattern.clone())?.wikilinks;
+            let filename = get_filename(file_path.as_path()).lowercase();
             for wikilink in wikilinks {
                 let alias = wikilink.alias();
                 if !lookup_table.contains_key(alias) {
                     if file_content.is_none() {
-                        file_content =
-                            Some(std::fs::read_to_string(file_path).map_err(|e| miette!(e))?);
+                        file_content = Some(std::fs::read_to_string(file_path)?);
                     }
                     out.push(
                         BrokenWikilink::builder()
