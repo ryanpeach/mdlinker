@@ -1,19 +1,68 @@
+use std::fmt::{Display, Formatter};
+
 use regex::Regex;
+
+/// An ngram, " " seperated, lowercase
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Ngram(String);
+
+impl Ngram {
+    #[must_use]
+    pub fn new(ngram: &[&str]) -> Self {
+        Self(
+            ngram
+                .iter()
+                .map(|s| s.to_lowercase())
+                .collect::<Vec<_>>()
+                .join(" "),
+        )
+    }
+    #[must_use]
+    pub fn nb_words(&self) -> usize {
+        self.0.split_whitespace().count()
+    }
+    #[must_use]
+    pub fn to_vec(&self) -> Vec<String> {
+        self.0
+            .split_whitespace()
+            .map(std::borrow::ToOwned::to_owned)
+            .collect()
+    }
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl Display for Ngram {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl PartialEq<&str> for Ngram {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other.to_lowercase()
+    }
+}
 
 /// Gives you ngrams of size 1..=n
 /// Stops on boundary pattern
 #[must_use]
-pub fn up_to_n(text: &str, n: usize, boundary_regex: &Regex, spacing_regex: &Regex) -> Vec<String> {
+pub fn up_to_n(text: &str, n: usize, boundary_regex: &Regex, spacing_regex: &Regex) -> Vec<Ngram> {
     let mut ngrams = Vec::new();
 
-    // Replace the spacing pattern with a single space
-    let text = spacing_regex.replace_all(text, " ");
-
     // Split the text into segments based on the boundaries (i.e., sentences/phrases)
-    let segments: Vec<&str> = boundary_regex.split(&text).collect();
+    let segments: Vec<&str> = boundary_regex.split(text).collect();
 
     // Generate n-grams for each segment
     for segment in segments {
+        // Replace the spacing pattern with a single space
+        let segment = spacing_regex.replace_all(segment, " ");
         let words: Vec<&str> = segment
             .split_whitespace()
             .filter(|&word| !word.is_empty())
@@ -24,7 +73,7 @@ pub fn up_to_n(text: &str, n: usize, boundary_regex: &Regex, spacing_regex: &Reg
             if words.len() >= n {
                 for i in 0..=words.len().saturating_sub(n) {
                     log::debug!("words: {:?}, i: {:?}, size: {:?}", words, i, n);
-                    let ngram = words[i..i + n].join(" ");
+                    let ngram = Ngram::new(&words[i..i + n]);
                     ngrams.push(ngram);
                 }
             }
@@ -38,12 +87,12 @@ pub fn up_to_n(text: &str, n: usize, boundary_regex: &Regex, spacing_regex: &Reg
 mod tests {
     use regex::Regex;
 
-    use super::up_to_n;
+    use super::{up_to_n, Ngram};
 
     const LOREM_IPSUM: &str = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
 
     /// Mostly used for testing the more efficient `up_to_n`
-    fn ngrams(text: &str, n: usize, boundary_pattern: &str) -> Vec<String> {
+    fn ngrams(text: &str, n: usize, boundary_pattern: &str) -> Vec<Ngram> {
         let mut ngrams = Vec::new();
 
         // Replace the spacing pattern with a single space
@@ -67,7 +116,7 @@ mod tests {
             // Only attempt to create n-grams if there are enough words
             if words.len() >= n {
                 for i in 0..=words.len().saturating_sub(n) {
-                    let ngram = words[i..i + n].join(" ");
+                    let ngram = Ngram::new(&words[i..i + n]);
                     ngrams.push(ngram);
                 }
             }

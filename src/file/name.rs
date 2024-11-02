@@ -6,7 +6,7 @@ use std::{
 
 use regex::Regex;
 
-use crate::ngrams::up_to_n;
+use crate::ngrams::{up_to_n, Ngram};
 
 use super::get_files;
 
@@ -88,7 +88,7 @@ pub fn ngrams(
     ngram_size: usize,
     boundary_regex: &Regex,
     filename_spacing_regex: &Regex,
-) -> HashMap<String, PathBuf> {
+) -> HashMap<Ngram, PathBuf> {
     let files = get_files(dirs);
     let mut file_name_ngrams = HashMap::new();
     for filepath in files {

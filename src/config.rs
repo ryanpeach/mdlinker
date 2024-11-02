@@ -37,13 +37,13 @@ pub struct Config {
     #[builder(default = 2)]
     pub ngram_size: usize,
     /// See [`self::cli::Config::boundary_pattern`]
-    #[builder(default=r"\s".to_owned())]
+    #[builder(default=r"___".to_owned())]
     pub boundary_pattern: String,
     /// See [`self::cli::Config::wikilink_pattern`]
     #[builder(default=r"#?\[\[(.*?)]]|#([A-Za-z0-9_]+)".to_owned())]
     pub wikilink_pattern: String,
     /// See [`self::cli::Config::filename_spacing_pattern`]
-    #[builder(default=r"___|__|-|_|\s".to_owned())]
+    #[builder(default=r"-|_|\s".to_owned())]
     pub filename_spacing_pattern: String,
     /// See [`self::cli::Config::filename_match_threshold`]
     #[builder(default = 2)]
