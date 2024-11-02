@@ -61,7 +61,13 @@ impl Wikilink {
             regex::Regex::new(wikilink_pattern).map_err(RegexError::CompileError)?;
         for mat in wikilink_pattern.captures_iter(contents) {
             let capture0 = mat.get(0).expect("0 always exists");
-            let Ok(alias) = mat.iter().skip(1).flatten().exactly_one() else {
+            let Ok(alias) = mat
+                .iter()
+                .skip(1)
+                .flatten()
+                .filter(|x| !x.as_str().trim().is_empty())
+                .exactly_one()
+            else {
                 return Err(RegexError::CaptureError {
                     pattern: wikilink_pattern.to_string(),
                     mat: mat.get(0).expect("0 always exists").as_str().to_string(),

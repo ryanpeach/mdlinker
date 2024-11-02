@@ -40,7 +40,7 @@ pub struct Config {
     #[builder(default=r"___".to_owned())]
     pub boundary_pattern: String,
     /// See [`self::cli::Config::wikilink_pattern`]
-    #[builder(default=r"#?\[\[(.*?)]]|#([A-Za-z0-9_]+)".to_owned())]
+    #[builder(default=r"\[\[([A-Za-z0-9_/\- ]+)]]|(?:(\s|^))#([A-Za-z0-9_]+)".to_owned())]
     pub wikilink_pattern: String,
     /// See [`self::cli::Config::filename_spacing_pattern`]
     #[builder(default=r"-|_|\s".to_owned())]
