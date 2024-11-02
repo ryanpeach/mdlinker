@@ -2,7 +2,13 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::sed::{ReplacePair, ReplacePairError};
+use crate::{
+    file::{
+        content::wikilink::Alias,
+        name::{Filename, FilenameLowercase},
+    },
+    sed::{ReplacePair, ReplacePairError},
+};
 
 use super::{Error, Partial};
 
@@ -36,19 +42,15 @@ pub(super) struct Config {
     #[serde(default)]
     pub exclude: Vec<String>,
 
-    /// Link conversion to file path using sed regex
-    /// Each outer vec contains an inner vec of a sequence of find/replace pairs
-    /// Meaning you can have several different and independent sequences of find/replace pairs
-    /// This makes it easier to manage multiple different types of links and conversions
+    /// Convert an alias to a filename
+    /// Kinda like a sed command
     #[serde(default)]
-    pub title_to_filepath: Vec<Vec<(String, String)>>,
+    pub alias_to_filename: (String, String),
 
-    /// Convert a filepath to the "title" lr name in a wikilink
-    /// Each outer vec contains an inner vec of a sequence of find/replace pairs
-    /// Meaning you can have several different and independent sequences of find/replace pairs
-    /// This makes it easier to manage multiple different types of links and conversions
+    /// Convert a filename to an alias
+    /// Kinda like a sed command
     #[serde(default)]
-    pub filepath_to_title: Vec<Vec<(String, String)>>,
+    pub filename_to_alias: (String, String),
 }
 
 impl Config {
@@ -97,42 +99,33 @@ impl Partial for Config {
         }
     }
 
-    fn filepath_to_title(&self) -> Option<Result<Vec<Vec<ReplacePair>>, ReplacePairError>> {
-        let out = self.filepath_to_title.clone();
-        if out.is_empty() {
-            None
-        } else {
-            let mut res = Vec::new();
-            for inner in out {
-                let mut inner_res = Vec::new();
-                for (find, replace) in inner {
-                    match ReplacePair::new(&find, &replace) {
-                        Ok(pair) => inner_res.push(pair),
-                        Err(e) => return Some(Err(e)),
-                    }
-                }
-                res.push(inner_res);
-            }
-            Some(Ok(res))
+    fn alias_to_filename(
+        &self,
+    ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairError>> {
+        let (to, from) = self.alias_to_filename.clone();
+        match (to.is_empty(), from.is_empty()) {
+            (true, true) => None,
+            (false, false) => Some(ReplacePair::new(&to, &from)),
+            (true, false) => Some(Err(ReplacePairError::ToError(regex::Error::Syntax(
+                "To is empty".to_string(),
+            )))),
+            (false, true) => Some(Err(ReplacePairError::FromError(regex::Error::Syntax(
+                "From is empty".to_string(),
+            )))),
         }
     }
-    fn title_to_filepath(&self) -> Option<Result<Vec<Vec<ReplacePair>>, ReplacePairError>> {
-        let out = self.title_to_filepath.clone();
-        if out.is_empty() {
-            None
-        } else {
-            let mut res = Vec::new();
-            for inner in out {
-                let mut inner_res = Vec::new();
-                for (find, replace) in inner {
-                    match ReplacePair::new(&find, &replace) {
-                        Ok(pair) => inner_res.push(pair),
-                        Err(e) => return Some(Err(e)),
-                    }
-                }
-                res.push(inner_res);
-            }
-            Some(Ok(res))
+
+    fn filename_to_alias(&self) -> Option<Result<ReplacePair<Filename, Alias>, ReplacePairError>> {
+        let (to, from) = self.alias_to_filename.clone();
+        match (to.is_empty(), from.is_empty()) {
+            (true, true) => None,
+            (false, false) => Some(ReplacePair::new(&to, &from)),
+            (true, false) => Some(Err(ReplacePairError::ToError(regex::Error::Syntax(
+                "To is empty".to_string(),
+            )))),
+            (false, true) => Some(Err(ReplacePairError::FromError(regex::Error::Syntax(
+                "From is empty".to_string(),
+            )))),
         }
     }
 }

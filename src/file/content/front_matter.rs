@@ -1,12 +1,12 @@
 mod logseq;
 mod yaml;
 
-use super::Error;
+use super::{wikilink::Alias, Error};
 
 #[derive(Debug, Default, Clone)]
 pub struct FrontMatter {
     /// The aliases of the file
-    pub aliases: Vec<String>,
+    pub aliases: Vec<Alias>,
 }
 
 impl FrontMatter {
@@ -15,7 +15,7 @@ impl FrontMatter {
         let out = yaml::Config::new(contents)?;
         if !out.is_empty() {
             return Ok(FrontMatter {
-                aliases: out.aliases.iter().map(|x| x.to_lowercase()).collect(),
+                aliases: out.aliases.iter().map(|x| Alias::new(x)).collect(),
             });
         }
 
@@ -23,7 +23,7 @@ impl FrontMatter {
         let out = logseq::Config::new(contents)?;
         if !out.is_empty() {
             return Ok(FrontMatter {
-                aliases: out.aliases.iter().map(|x| x.to_lowercase()).collect(),
+                aliases: out.aliases.iter().map(|x| Alias::new(x)).collect(),
             });
         }
 
@@ -44,9 +44,9 @@ mod tests {
         assert_eq!(
             config.aliases,
             vec![
-                "name1".to_string(),
-                "name2".to_string(),
-                "name3".to_string()
+                Alias::new("name1"),
+                Alias::new("name2"),
+                Alias::new("name3")
             ]
         );
     }
@@ -58,7 +58,7 @@ mod tests {
         let config = FrontMatter::new(text).unwrap();
         assert_eq!(
             config.aliases,
-            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+            vec![Alias::new("a"), Alias::new("b"), Alias::new("c")]
         );
     }
 }

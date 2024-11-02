@@ -43,16 +43,13 @@ impl OutputReport {
 /// but if this library runs, even if it finds linting violations, this returns an Ok
 pub fn lib(config: &config::Config) -> Result<OutputReport> {
     // Compile our regex patterns
-    let boundary_regex = regex::Regex::new(config.boundary_pattern()).map_err(|e| miette!(e))?;
+    let boundary_regex = regex::Regex::new(&config.boundary_pattern).map_err(|e| miette!(e))?;
     let filename_spacing_regex =
-        regex::Regex::new(config.filename_spacing_pattern()).map_err(|e| miette!(e))?;
-    // We need to test for this ahead of time due to caching reasons, and its just nice to put all
-    // the regex errors next to each other
-    let _wikilink_regex = regex::Regex::new(config.wikilink_pattern()).map_err(|e| miette!(e))?;
+        regex::Regex::new(&config.filename_spacing_pattern).map_err(|e| miette!(e))?;
 
     let file_ngrams = ngrams(
-        config.directories().clone(),
-        *config.ngram_size(),
+        config.directories.clone(),
+        config.ngram_size,
         &boundary_regex,
         &filename_spacing_regex,
     );
@@ -60,15 +57,15 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
     // All our reports
     // NOTE: Always use `filter_by_excludes` and `dedupe_by_code` on the reports
     let similar_filenames =
-        SimilarFilename::calculate(&file_ngrams, *config.filename_match_threshold())
+        SimilarFilename::calculate(&file_ngrams, config.filename_match_threshold)
             .map_err(|e| miette!("From SimilarFilename: {e}"))?
-            .filter_by_excludes(config.exclude().clone())
+            .filter_by_excludes(config.exclude.clone())
             .dedupe_by_code();
 
     let duplicate_aliases =
-        DuplicateAlias::calculate(get_files(config.directories().clone()), config)
+        DuplicateAlias::calculate(get_files(config.directories.clone()), config)
             .map_err(|e| miette!("From DuplicateAlias: {e}"))?
-            .filter_by_excludes(config.exclude().clone())
+            .filter_by_excludes(config.exclude.clone())
             .dedupe_by_code();
 
     // Unfortunately we can't continue if we have duplicate aliases
@@ -83,9 +80,9 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
     }
 
     let broken_wikilinks =
-        BrokenWikilink::calculate(get_files(config.directories().clone()).as_slice(), config)
+        BrokenWikilink::calculate(get_files(config.directories.clone()).as_slice(), config)
             .map_err(|e| miette!("From BrokenWikilink: {e}"))?
-            .filter_by_excludes(config.exclude().clone())
+            .filter_by_excludes(config.exclude.clone())
             .dedupe_by_code();
 
     // Return

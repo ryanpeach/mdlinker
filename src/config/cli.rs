@@ -1,7 +1,13 @@
 use clap::Parser;
 use std::path::PathBuf;
 
-use crate::sed::{ReplacePair, ReplacePairError};
+use crate::{
+    file::{
+        content::wikilink::Alias,
+        name::{Filename, FilenameLowercase},
+    },
+    sed::{ReplacePair, ReplacePairError},
+};
 
 use super::Partial;
 
@@ -77,10 +83,12 @@ impl Partial for Config {
             Some(out)
         }
     }
-    fn filepath_to_title(&self) -> Option<Result<Vec<Vec<ReplacePair>>, ReplacePairError>> {
+    fn filename_to_alias(&self) -> Option<Result<ReplacePair<Filename, Alias>, ReplacePairError>> {
         None
     }
-    fn title_to_filepath(&self) -> Option<Result<Vec<Vec<ReplacePair>>, ReplacePairError>> {
+    fn alias_to_filename(
+        &self,
+    ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairError>> {
         None
     }
 }

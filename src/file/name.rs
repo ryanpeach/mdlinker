@@ -1,50 +1,84 @@
 use std::{
     collections::HashMap,
+    fmt::{Display, Formatter},
     path::{Path, PathBuf},
 };
 
 use regex::Regex;
 
-use crate::{ngrams::up_to_n, sed::ReplacePair};
+use crate::ngrams::up_to_n;
 
 use super::get_files;
+
+/// A filename is a representation of the file name in its original casing
+/// And with its original seperators
+/// but without its extension and without its path
+///
+/// # Example
+/// `asdf/Foo___Bar.md` -> `Foo___Bar`
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Filename(String);
+
+impl Filename {
+    #[must_use]
+    pub fn new(filename: &str) -> Self {
+        Self(filename.to_owned())
+    }
+    #[must_use]
+    pub fn lowercase(&self) -> FilenameLowercase {
+        FilenameLowercase::new(&self.0)
+    }
+}
+
+impl Display for Filename {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<String> for Filename {
+    fn from(s: String) -> Self {
+        Self::new(&s)
+    }
+}
+
+/// Sometimes you are given a lowercase [`Filename`] and you have to make due
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct FilenameLowercase(String);
+
+impl FilenameLowercase {
+    #[must_use]
+    pub fn new(filename: &str) -> Self {
+        Self(filename.to_owned().to_lowercase())
+    }
+}
+
+impl Display for FilenameLowercase {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<String> for FilenameLowercase {
+    fn from(s: String) -> Self {
+        Self::new(&s)
+    }
+}
 
 /// Get the filename from a path
 /// Does not include the file extension
 #[must_use]
-pub fn get_filename(path: &Path) -> String {
+pub fn get_filename(path: &Path) -> Filename {
     let fname = path
         .file_name()
         .expect("We were given a guaranteed file path, not a directory")
         .to_string_lossy();
-    return fname
-        .split('.')
-        .next()
-        .expect("File paths will either have a file extension or not, it makes no difference")
-        .to_string()
-        .to_lowercase();
-}
-
-/// Get the filename from a path
-/// Does not include the file extension
-/// Replaces the ___ with / (assuming logseq)
-#[must_use]
-pub fn get_filename_as_alias(
-    path: &Path,
-    filename_spacing_to_group_spacing: &ReplacePair,
-) -> String {
-    let fname = get_filename(path);
-    ReplacePair::apply(filename_spacing_to_group_spacing, &fname)
-}
-
-/// Get the segments of a filename based on [`boundary_regex`]
-#[must_use]
-pub fn filename_segments(path: &Path, filename_spacing_regex: &Regex) -> Vec<String> {
-    let filename = get_filename(path);
-    filename_spacing_regex
-        .split(&filename)
-        .map(std::string::ToString::to_string)
-        .collect()
+    return Filename::new(
+        fname
+            .split('.')
+            .next()
+            .expect("File paths will either have a file extension or not, it makes no difference"),
+    );
 }
 
 /// Generate n-grams from the filenames found in the directories
@@ -60,13 +94,15 @@ pub fn ngrams(
     for filepath in files {
         let filename = get_filename(&filepath);
         let ngrams = up_to_n(
-            &filename,
+            &filename.to_string(),
             ngram_size,
             boundary_regex,
             filename_spacing_regex,
         );
-        log::debug!("Filename: {}, ngrams: {:?}", filename, ngrams.len());
-        file_name_ngrams.insert(filename, filepath);
+        log::debug!("Filename: {:?}, ngrams: {:?}", filename, ngrams.len());
+        for ngram in ngrams {
+            file_name_ngrams.insert(ngram, filepath.clone());
+        }
     }
     file_name_ngrams
 }

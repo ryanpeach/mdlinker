@@ -54,19 +54,21 @@ impl SimilarFilename {
         // file paths as strings
         let file1 = file1_path.to_string_lossy().to_lowercase();
         let file2 = file2_path.to_string_lossy().to_lowercase();
+        let file1_ngram = file1_ngram.to_lowercase();
+        let file2_ngram = file2_ngram.to_lowercase();
 
         // Assemble the source
         let source = format!("{file1}\n{file2}");
         let filepaths = source.clone();
 
         // Find the ngrams in each filepath
-        let find1 = file1.find(file1_ngram).ok_or_else(|| {
+        let find1 = file1.find(&file1_ngram).ok_or_else(|| {
             MissingSubstringError::builder()
                 .path(file1_path.to_path_buf())
                 .ngram(file1_ngram.to_string())
                 .build()
         })?;
-        let find2 = file2.find(file2_ngram).ok_or_else(|| {
+        let find2 = file2.find(&file2_ngram).ok_or_else(|| {
             MissingSubstringError::builder()
                 .path(file2_path.to_path_buf())
                 .ngram(file2_ngram.to_string())
@@ -138,7 +140,7 @@ impl SimilarFilename {
                 }
 
                 // Score the ngrams and check if they match
-                let score = matcher.fuzzy_match(ngram, other_ngram);
+                let score = matcher.fuzzy_match(&ngram.to_string(), &other_ngram.to_string());
                 if let Some(score) = score {
                     if score > filename_match_threshold {
                         log::info!("Match! {:?} and {:?}", filepath, other_filepath);
@@ -179,6 +181,7 @@ impl SimilarFilename {
     fn logseq_same_group(file1: &Path, file2: &Path) -> bool {
         let file1 = get_filename(file1);
         let file2 = get_filename(file2);
-        file1.starts_with(&file2) || file2.starts_with(&file1)
+        file1.to_string().starts_with(&file2.to_string())
+            || file2.to_string().starts_with(&file1.to_string())
     }
 }
