@@ -82,6 +82,8 @@ pub enum NewDuplicateAliasError {
     MissingSubstringError(#[from] MissingSubstringError),
     #[error(transparent)]
     ReplacePairError(#[from] ReplacePairError),
+    #[error("The file {filename} contains its own alias {alias}")]
+    AliasAndFilenameSame { filename: Filename, alias: Alias },
 }
 
 #[derive(Error, Debug)]
@@ -108,7 +110,14 @@ impl DuplicateAlias {
         file1_path: &PathBuf,
         file2_path: &PathBuf,
     ) -> Result<Self, NewDuplicateAliasError> {
-        assert_ne!(file1_path, file2_path);
+        // Boundary conditions
+        if file1_path == file2_path {
+            return Err(NewDuplicateAliasError::AliasAndFilenameSame {
+                filename: get_filename(file1_path.as_path()),
+                alias: alias.clone(),
+            });
+        }
+
         // Create the unique id
         let id = format!("{CODE}::{alias}");
 
