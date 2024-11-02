@@ -74,4 +74,19 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn test_new_with_spaces() {
+        let text = "alias:: name1, name2, name3";
+        // create the config
+        let config = Config::new(text).unwrap();
+        assert_eq!(
+            config.aliases,
+            vec![
+                "name1".to_string(),
+                "name2".to_string(),
+                "name3".to_string()
+            ]
+        );
+    }
 }

@@ -61,18 +61,19 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
     // NOTE: Always use `filter_by_excludes` and `dedupe_by_code` on the reports
     let similar_filenames =
         SimilarFilename::calculate(&file_ngrams, *config.filename_match_threshold())
-            .map_err(|e| miette!(e))?
+            .map_err(|e| miette!("From SimilarFilename: {e}"))?
             .filter_by_excludes(config.exclude().clone())
             .dedupe_by_code();
 
     let duplicate_aliases =
         DuplicateAlias::calculate(get_files(config.directories().clone()), config)
-            .map_err(|e| miette!(e))?
+            .map_err(|e| miette!("From DuplicateAlias: {e}"))?
             .filter_by_excludes(config.exclude().clone())
             .dedupe_by_code();
 
     // Unfortunately we can't continue if we have duplicate aliases
     if !duplicate_aliases.is_empty() {
+        log::debug!("Duplicate aliases found, skipping BrokenWikilink check");
         // Return
         return Ok(OutputReport::builder()
             .similar_filenames(similar_filenames)
@@ -82,8 +83,8 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
     }
 
     let broken_wikilinks =
-        BrokenWikilink::calculate(get_files(config.directories().clone()), config)
-            .map_err(|e| miette!(e))?
+        BrokenWikilink::calculate(get_files(config.directories().clone()).as_slice(), config)
+            .map_err(|e| miette!("From BrokenWikilink: {e}"))?
             .filter_by_excludes(config.exclude().clone())
             .dedupe_by_code();
 

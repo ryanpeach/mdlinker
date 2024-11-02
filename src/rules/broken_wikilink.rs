@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use bon::Builder;
 use miette::{miette, Diagnostic, NamedSource, Result, SourceSpan};
@@ -44,31 +44,14 @@ impl HasId for BrokenWikilink {
 }
 
 impl BrokenWikilink {
-    pub fn calculate(files: Vec<PathBuf>, config: &Config) -> Result<Vec<BrokenWikilink>> {
-        // First we need to collect all the file names and and aliases and collect a lookup table
-        // relating the string and the path to the file
-        // We may hit a duplicate alias
-        // In this case the developer forgot to run the duplicate aliases rule first
-        let mut lookup_table = HashMap::<String, PathBuf>::new();
-        for file_path in &files {
-            lookup_table.insert(get_filename(file_path.as_path()), file_path.clone());
-            let front_matter = from_file(file_path.clone(), config.wikilink_pattern().clone())
-                .map_err(|e| miette!(e))?
-                .front_matter;
-            for alias in front_matter.aliases {
-                if let Some(out) = lookup_table.insert(alias.clone(), file_path.clone()) {
-                    return match DuplicateAlias::new(&alias, &out, file_path) {
-                        Ok(duplicatealias) => Err(miette!(duplicatealias)),
-                        Err(e) => Err(miette!(e)),
-                    };
-                }
-            }
-        }
+    pub fn calculate(files: &[PathBuf], config: &Config) -> Result<Vec<BrokenWikilink>> {
+        let (lookup_table, _) =
+            DuplicateAlias::get_alias_to_path_table_and_duplicates(files.into(), config)?;
 
         // Now we will take each file, get its wikilinks, and check that their alias is in the
         // lookup_table. If not, we will add a BrokenWikilink to out
         let mut out = Vec::new();
-        for file_path in &files {
+        for file_path in files {
             let mut file_content = None;
             let wikilinks = from_file(file_path.clone(), config.wikilink_pattern().clone())
                 .map_err(|e| miette!(e))?

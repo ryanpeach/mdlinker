@@ -153,12 +153,22 @@ impl DuplicateAlias {
     }
 
     pub fn calculate(files: Vec<PathBuf>, config: &Config) -> Result<Vec<DuplicateAlias>> {
+        Ok(Self::get_alias_to_path_table_and_duplicates(files, config)?.1)
+    }
+
+    /// This is a helper function for both [`crate::rules::broken_wikilink::BrokenWikilink`] and [`Self::calculate`]
+    pub fn get_alias_to_path_table_and_duplicates(
+        files: Vec<PathBuf>,
+        config: &Config,
+    ) -> Result<(HashMap<String, PathBuf>, Vec<DuplicateAlias>)> {
         // First we need to collect all the file names and and aliases and collect a lookup table
         // relating the string and the path to the file
         // We may hit a duplicate alias, if so we need to collect all of them and stop
         let mut lookup_table = HashMap::<String, PathBuf>::new();
         let mut duplicates: Vec<DuplicateAlias> = Vec::new();
         for file_path in files {
+            let filename = get_filename(file_path.as_path());
+            lookup_table.insert(filename, file_path.clone());
             let front_matter = from_file(file_path.clone(), config.wikilink_pattern().clone())
                 .map_err(|e| miette!(e))?
                 .front_matter;
@@ -170,6 +180,6 @@ impl DuplicateAlias {
                 }
             }
         }
-        Ok(duplicates)
+        Ok((lookup_table, duplicates))
     }
 }

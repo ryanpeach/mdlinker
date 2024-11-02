@@ -1,1 +1,1 @@
-alias:: dolors
+alias:: dolor
