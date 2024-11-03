@@ -1,8 +1,15 @@
-use std::path::Path;
+use std::{cell::RefCell, path::Path};
 
+use comrak::{
+    arena_tree::Node,
+    nodes::{Ast, NodeValue},
+};
 use serde::Deserialize;
 
-use crate::{rules::ErrorCode, visitor::Visitor};
+use crate::{
+    rules::ErrorCode,
+    visitor::{VisitError, Visitor},
+};
 
 use super::wikilink::Alias;
 
@@ -18,7 +25,6 @@ pub struct FrontMatterVisitor {
 }
 
 impl FrontMatterVisitor {
-    pub const NODE_KIND: &'static str = "document";
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -26,19 +32,14 @@ impl FrontMatterVisitor {
 }
 
 impl Visitor for FrontMatterVisitor {
-    fn visit(&mut self, node: &tree_sitter::Node, source: &str) {
-        let node_type = node.kind();
-        if node_type == Self::NODE_KIND {
-            let tag_text = node
-                .utf8_text(source.as_bytes())
-                .expect("The text must exist... right?"); // TODO: Investigate
-            if let Ok(YamlFrontMatter { alias }) = serde_yaml::from_str::<YamlFrontMatter>(tag_text)
-            {
-                for alias in alias.split(',') {
-                    self.aliases.push(Alias::new(alias.trim()));
-                }
-            }; // TODO: Return miette! error with filename
+    fn visit(&mut self, node: &Node<RefCell<Ast>>, _source: &str) -> Result<(), VisitError> {
+        if let NodeValue::FrontMatter(text) = &node.data.borrow().value {
+            let YamlFrontMatter { alias } = serde_yaml::from_str::<YamlFrontMatter>(&text)?;
+            for alias in alias.split(',') {
+                self.aliases.push(Alias::new(alias.trim()));
+            }
         }
+        Ok(())
     }
     fn finalize_file(
         &mut self,

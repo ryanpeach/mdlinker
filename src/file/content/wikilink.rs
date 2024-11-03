@@ -1,6 +1,10 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    cell::RefCell,
+    fmt::{Display, Formatter},
+};
 
 use bon::Builder;
+use comrak::{arena_tree::Node, nodes::Ast};
 use miette::SourceSpan;
 use tree_sitter::Node;
 
@@ -62,6 +66,16 @@ impl WikilinkVisitor {
 }
 
 impl Visitor for WikilinkVisitor {
+    fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
+        if let NodeValue::FrontMatter(text) = &node.data.borrow().value {
+            let YamlFrontMatter { alias } = serde_yaml::from_str::<YamlFrontMatter>(&text)?;
+            for alias in alias.split(',') {
+                self.aliases.push(Alias::new(alias.trim()));
+            }
+        }
+        Ok(())
+    }
+
     fn visit(&mut self, node: &Node, source: &str) {
         let node_kind = node.kind();
         if Self::NODE_KINDS.contains(&node_kind) {
