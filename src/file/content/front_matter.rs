@@ -1,64 +1,40 @@
-mod logseq;
-mod yaml;
+use std::path::PathBuf;
 
-use super::{wikilink::Alias, Error};
+use crate::{rules::ErrorCode, visitor::Visitor};
+
+use super::wikilink::Alias;
 
 #[derive(Debug, Default, Clone)]
-pub struct FrontMatter {
+pub struct FrontMatterVisitor {
     /// The aliases of the file
     pub aliases: Vec<Alias>,
 }
 
-impl FrontMatter {
-    pub(super) fn new(contents: &str) -> Result<Self, Error> {
-        // Try to parse as YAML
-        let out = yaml::Config::new(contents)?;
-        if !out.is_empty() {
-            return Ok(FrontMatter {
-                aliases: out.aliases.iter().map(|x| Alias::new(x)).collect(),
-            });
-        }
-
-        // Try to parse as Logseq
-        let out = logseq::Config::new(contents)?;
-        if !out.is_empty() {
-            return Ok(FrontMatter {
-                aliases: out.aliases.iter().map(|x| Alias::new(x)).collect(),
-            });
-        }
-
-        // If we can't parse it, return the default
-        Ok(Self::default())
+impl FrontMatterVisitor {
+    pub const NODE_KIND: &'static str = "alias";
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_new_logseq() {
-        let text = "\nalias:: name1,name2,name3\n";
-        // create the config
-        let config = FrontMatter::new(text).unwrap();
-        assert_eq!(
-            config.aliases,
-            vec![
-                Alias::new("name1"),
-                Alias::new("name2"),
-                Alias::new("name3")
-            ]
-        );
+impl Visitor for FrontMatterVisitor {
+    fn visit(&mut self, node: &tree_sitter::Node, source: &str) {
+        let node_type = node.kind();
+        if node_type == Self::NODE_KIND {
+            let tag_text = node.utf8_text(source.as_bytes()).unwrap();
+            self.aliases.push(Alias::new(tag_text));
+        }
     }
-
-    #[test]
-    fn test_new_yaml() {
-        let text = "---\nalias: [\"a\",\"b\",\"c\"]\n---";
-        // create the config
-        let config = FrontMatter::new(text).unwrap();
-        assert_eq!(
-            config.aliases,
-            vec![Alias::new("a"), Alias::new("b"), Alias::new("c")]
-        );
+    fn finalize_file(
+        &mut self,
+        _source: &str,
+        _path: &PathBuf,
+    ) -> Result<(), crate::visitor::FinalizeError> {
+        self.aliases.clear();
+        Ok(())
+    }
+    fn finalize(&mut self, _exclude: &Vec<ErrorCode>) -> Result<(), crate::visitor::FinalizeError> {
+        self.aliases.clear();
+        Ok(())
     }
 }

@@ -1,5 +1,5 @@
+use hashbrown::HashMap;
 use std::{
-    collections::HashMap,
     fmt::{Display, Formatter},
     path::{Path, PathBuf},
 };
@@ -84,15 +84,14 @@ pub fn get_filename(path: &Path) -> Filename {
 /// Generate n-grams from the filenames found in the directories
 #[must_use]
 pub fn ngrams(
-    dirs: Vec<PathBuf>,
+    files: &Vec<PathBuf>,
     ngram_size: usize,
     boundary_regex: &Regex,
     filename_spacing_regex: &Regex,
 ) -> HashMap<Ngram, PathBuf> {
-    let files = get_files(dirs);
     let mut file_name_ngrams = HashMap::new();
     for filepath in files {
-        let filename = get_filename(&filepath);
+        let filename = get_filename(filepath);
         let ngrams = up_to_n(
             &filename.to_string(),
             ngram_size,

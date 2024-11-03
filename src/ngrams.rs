@@ -1,6 +1,18 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    path::PathBuf,
+};
 
+use bon::Builder;
 use regex::Regex;
+use thiserror::Error;
+
+#[derive(Error, Debug, Builder)]
+#[error("{path} does not contain the ngram {ngram}")]
+pub struct MissingSubstringError {
+    pub path: PathBuf,
+    pub ngram: String,
+}
 
 /// An ngram, " " seperated, lowercase
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -127,7 +139,7 @@ mod tests {
 
     #[cfg(test)]
     mod test_ngrams {
-        use std::collections::HashSet;
+        use hashbrown::HashSet;
 
         use regex::Regex;
 

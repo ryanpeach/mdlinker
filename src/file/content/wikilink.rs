@@ -1,14 +1,14 @@
 use std::fmt::{Display, Formatter};
 
 use bon::Builder;
-use getset::Getters;
-use itertools::Itertools;
 use miette::SourceSpan;
+use tree_sitter::Node;
 
 use crate::{
     config::Config,
     file::name::Filename,
-    sed::{RegexError, ReplacePairError},
+    sed::{ReplacePair, ReplacePairCompilationError},
+    visitor::Visitor,
 };
 
 /// A linkable string, like that in a wikilink, or its corresponding filename
@@ -36,50 +36,64 @@ impl From<String> for Alias {
 }
 
 impl Alias {
-    pub fn from_filename(filename: &Filename, config: &Config) -> Result<Alias, ReplacePairError> {
-        match config.filename_to_alias.clone() {
-            Ok(pair) => Ok(pair.apply(filename)),
-            Err(e) => Err(e),
+    pub fn from_filename(
+        filename: &Filename,
+        filename_to_alias: &ReplacePair<Filename, Alias>,
+    ) -> Alias {
+        filename_to_alias.apply(filename)
+    }
+}
+
+#[derive(Builder, Clone, Debug)]
+pub struct Wikilink {
+    pub alias: Alias,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct WikilinkVisitor {
+    pub wikilinks: Vec<Wikilink>,
+}
+
+impl WikilinkVisitor {
+    pub const NODE_KIND: &'static str = "wikilink";
+    pub fn new() -> Self {
+        Self {
+            wikilinks: Vec::new(),
         }
     }
 }
 
-#[derive(Builder, Getters, Clone, Debug)]
-#[getset(get = "pub")]
-pub struct Wikilink {
-    alias: Alias,
-    span: SourceSpan,
-}
-
-impl Wikilink {
-    pub(super) fn get_wikilinks(
-        contents: &str,
-        wikilink_pattern: &str,
-    ) -> Result<Vec<Wikilink>, RegexError> {
-        let mut wikilinks = Vec::new();
-        let wikilink_pattern =
-            regex::Regex::new(wikilink_pattern).map_err(RegexError::CompileError)?;
-        for mat in wikilink_pattern.captures_iter(contents) {
-            let capture0 = mat.get(0).expect("0 always exists");
-            let Ok(alias) = mat
-                .iter()
-                .skip(1)
-                .flatten()
-                .filter(|x| !x.as_str().trim().is_empty())
-                .exactly_one()
-            else {
-                return Err(RegexError::CaptureError {
-                    pattern: wikilink_pattern.to_string(),
-                    mat: mat.get(0).expect("0 always exists").as_str().to_string(),
-                });
-            };
-            wikilinks.push(
+impl Visitor for WikilinkVisitor {
+    fn visit(&mut self, node: &Node, source: &str) {
+        let node_type = node.kind();
+        if node_type == Self::NODE_KIND {
+            let tag_text = node.utf8_text(source.as_bytes()).unwrap();
+            let span = SourceSpan::new(
+                node.start_byte().into(),
+                node.end_byte() - node.start_byte(),
+            );
+            self.wikilinks.push(
                 Wikilink::builder()
-                    .span(SourceSpan::new(capture0.start().into(), capture0.len()))
-                    .alias(Alias::new(alias.as_str()))
+                    .alias(Alias::new(tag_text))
+                    .span(span)
                     .build(),
             );
         }
-        Ok(wikilinks)
+    }
+    fn finalize_file(
+        &mut self,
+        _source: &str,
+        _path: &std::path::PathBuf,
+    ) -> Result<(), crate::visitor::FinalizeError> {
+        self.wikilinks.clear();
+        Ok(())
+    }
+    fn finalize(
+        &mut self,
+        _exclude: &Vec<crate::rules::ErrorCode>,
+    ) -> Result<(), crate::visitor::FinalizeError> {
+        self.wikilinks.clear();
+        Ok(())
     }
 }

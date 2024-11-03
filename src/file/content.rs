@@ -1,11 +1,18 @@
-#![allow(clippy::needless_pass_by_value)]
-use std::{fs, path::PathBuf};
+use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
 
-use cached::proc_macro::cached;
-use front_matter::FrontMatter;
-use wikilink::Wikilink;
+use front_matter::FrontMatterVisitor;
+use tree_sitter::Parser;
+use wikilink::{Alias, Wikilink, WikilinkVisitor};
 
-use super::Error;
+use crate::{
+    sed::{ReplacePair, ReplacePairCompilationError},
+    visitor::{parse, Visitor},
+};
+
+use super::{
+    name::{get_filename, Filename},
+    Error,
+};
 
 pub mod front_matter;
 pub mod wikilink;
@@ -13,20 +20,17 @@ pub mod wikilink;
 #[derive(Clone)]
 pub struct FromFile {
     pub path: PathBuf,
-    pub front_matter: FrontMatter,
+    pub aliases: Vec<Alias>,
     pub wikilinks: Vec<Wikilink>,
 }
 
-/// Get all information from a file needed for the rest of the program
-/// Importantly, this is cached, so you don't have to pass around the results
-/// Just run it at the very beginning of the program
-#[cached(result = true)]
-pub fn from_file(path: PathBuf, wikilink_pattern: String) -> Result<FromFile, Error> {
-    let contents = fs::read_to_string(path.clone()).map_err(Error::IoError)?;
-    Ok(FromFile {
-        path,
-        front_matter: FrontMatter::new(&contents)?,
-        wikilinks: Wikilink::get_wikilinks(&contents, &wikilink_pattern)
-            .map_err(Error::RegexError)?,
-    })
+#[derive(Error, Debug)]
+pub enum FromFileError {
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
+    #[error("Failed to create alias from filename {path}: {e}")]
+    AliasFromFilenameError {
+        e: ReplacePairCompilationError,
+        path: String,
+    },
 }

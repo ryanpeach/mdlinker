@@ -6,7 +6,8 @@ use crate::{
         content::wikilink::Alias,
         name::{Filename, FilenameLowercase},
     },
-    sed::{ReplacePair, ReplacePairError},
+    rules::ErrorCode,
+    sed::{ReplacePair, ReplacePairCompilationError},
 };
 
 use super::Partial;
@@ -32,11 +33,6 @@ pub(super) struct Config {
     /// Regex pattern to stop n-gram generation on, like , or .
     #[clap(short = 'b', long = "bound")]
     pub boundary_pattern: Option<String>,
-
-    /// Regex pattern for wikilinks
-    /// Capture group 0 is skipped to enable lookbehind
-    #[clap(short = 'w', long = "wikilink")]
-    pub wikilink_pattern: Option<String>,
 
     /// Regex pattern to split filenames on, like ___ or /
     #[clap(short = 's', long = "space")]
@@ -67,29 +63,28 @@ impl Partial for Config {
     fn boundary_pattern(&self) -> Option<String> {
         self.boundary_pattern.clone()
     }
-    fn wikilink_pattern(&self) -> Option<String> {
-        self.wikilink_pattern.clone()
-    }
     fn filename_spacing_pattern(&self) -> Option<String> {
         self.filename_spacing_pattern.clone()
     }
     fn filename_match_threshold(&self) -> Option<i64> {
         self.filename_match_threshold
     }
-    fn exclude(&self) -> Option<Vec<String>> {
+    fn exclude(&self) -> Option<Vec<ErrorCode>> {
         let out = self.exclude.clone();
         if out.is_empty() {
             None
         } else {
-            Some(out)
+            Some(out.into_iter().map(ErrorCode::new).collect())
         }
     }
-    fn filename_to_alias(&self) -> Option<Result<ReplacePair<Filename, Alias>, ReplacePairError>> {
+    fn filename_to_alias(
+        &self,
+    ) -> Option<Result<ReplacePair<Filename, Alias>, ReplacePairCompilationError>> {
         None
     }
     fn alias_to_filename(
         &self,
-    ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairError>> {
+    ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairCompilationError>> {
         None
     }
 }

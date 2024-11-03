@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use mdlinker::rules::broken_wikilink;
 
+use mdlinker::rules::filter_code;
 use mdlinker::rules::VecHasIdExtensions;
 
 use crate::common::get_report;
@@ -28,10 +29,11 @@ fn lorem_exist_and_is_wikilink() {
     for broken_wikilink in &report.broken_wikilinks {
         println!("{broken_wikilink:?}");
     }
-    assert!(report
-        .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::lorem", broken_wikilink::CODE))
-        .is_empty());
+    assert!(filter_code(
+        report.broken_wikilinks,
+        &format!("{}::2024_11_01::lorem", broken_wikilink::CODE).into()
+    )
+    .is_empty());
 }
 
 /// This fails because the link is invalid
@@ -41,10 +43,11 @@ fn ipsum_does_not_exist_and_is_wikilink() {
     for broken_wikilink in &report.broken_wikilinks {
         println!("{broken_wikilink:?}");
     }
-    assert!(!report
-        .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::ipsum", broken_wikilink::CODE))
-        .is_empty());
+    assert!(!filter_code(
+        report.broken_wikilinks,
+        &format!("{}::2024_11_01::ipsum", broken_wikilink::CODE).into()
+    )
+    .is_empty());
 }
 
 /// This passes because there is no link
@@ -54,10 +57,11 @@ fn dolor_does_not_exist_and_is_not_wikilink() {
     for broken_wikilink in &report.broken_wikilinks {
         println!("{broken_wikilink:?}");
     }
-    assert!(report
-        .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::dolor", broken_wikilink::CODE))
-        .is_empty());
+    assert!(filter_code(
+        report.broken_wikilinks,
+        &format!("{}::2024_11_01::dolor", broken_wikilink::CODE).into()
+    )
+    .is_empty());
 }
 
 /// This passes because the link is valid
@@ -68,10 +72,11 @@ fn sit_exists_and_is_tag() {
     for broken_wikilink in &report.broken_wikilinks {
         println!("{broken_wikilink:?}");
     }
-    assert!(report
-        .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::sit", broken_wikilink::CODE))
-        .is_empty());
+    assert!(filter_code(
+        report.broken_wikilinks,
+        &format!("{}::2024_11_01::sit", broken_wikilink::CODE).into()
+    )
+    .is_empty());
 }
 
 /// This fails because the link is invalid
@@ -82,8 +87,9 @@ fn amet_does_not_exist_and_is_tag() {
     for broken_wikilink in &report.broken_wikilinks {
         println!("{broken_wikilink:?}");
     }
-    assert!(!report
-        .broken_wikilinks
-        .contains_code(&format!("{}::2024_11_01::amet", broken_wikilink::CODE))
-        .is_empty());
+    assert!(!filter_code(
+        report.broken_wikilinks,
+        &format!("{}::2024_11_01::amet", broken_wikilink::CODE).into()
+    )
+    .is_empty());
 }
