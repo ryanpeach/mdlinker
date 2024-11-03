@@ -3,14 +3,20 @@ pub mod file;
 pub mod ngrams;
 pub mod rules;
 pub mod sed;
+pub mod visitor;
+
+use std::{cell::RefCell, fs, rc::Rc};
 
 use bon::Builder;
 use file::{get_files, name::ngrams};
 use miette::{miette, Result};
 use rules::{
-    broken_wikilink::BrokenWikilink, duplicate_alias::DuplicateAlias,
+    broken_wikilink::{BrokenWikilink, BrokenWikilinkVisitor},
+    duplicate_alias::DuplicateAlias,
     similar_filename::SimilarFilename,
 };
+use tree_sitter::Parser;
+use visitor::{parse, Visitor};
 
 use crate::rules::VecHasIdExtensions;
 
@@ -42,13 +48,19 @@ impl OutputReport {
 /// Basically if this library fails, this returns an Err
 /// but if this library runs, even if it finds linting violations, this returns an Ok
 pub fn lib(config: &config::Config) -> Result<OutputReport> {
+    // Load the grammar (this assumes you've linked the grammar properly)
+    let language = tree_sitter_markdown::language();
+    let mut parser = Parser::new();
+    parser.set_language(language).map_err(|e| miette!(e))?;
+
     // Compile our regex patterns
     let boundary_regex = regex::Regex::new(&config.boundary_pattern).map_err(|e| miette!(e))?;
     let filename_spacing_regex =
         regex::Regex::new(&config.filename_spacing_pattern).map_err(|e| miette!(e))?;
 
+    let all_files = get_files(&config.directories);
     let file_ngrams = ngrams(
-        config.directories.clone(),
+        &all_files,
         config.ngram_size,
         &boundary_regex,
         &filename_spacing_regex,
@@ -61,39 +73,30 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
         config.filename_match_threshold,
         &filename_spacing_regex,
     )
-    .map_err(|e| miette!("From SimilarFilename: {e}"))?;
-    similar_filenames.sort_by(|b, a| a.partial_cmp(b).expect("This never fails"));
-    let similar_filenames = similar_filenames
-        .filter_by_excludes(config.exclude.clone())
-        .dedupe_by_code();
+    .map_err(|e| miette!("From SimilarFilename: {e}"))?
+    .finalize(&config.exclude);
 
-    let duplicate_aliases =
-        DuplicateAlias::calculate(get_files(config.directories.clone()), config)
-            .map_err(|e| miette!("From DuplicateAlias: {e}"))?
-            .filter_by_excludes(config.exclude.clone())
-            .dedupe_by_code();
-
-    // Unfortunately we can't continue if we have duplicate aliases
-    if !duplicate_aliases.is_empty() {
-        log::debug!("Duplicate aliases found, skipping BrokenWikilink check");
-        // Return
-        return Ok(OutputReport::builder()
-            .similar_filenames(similar_filenames)
-            .duplicate_aliases(duplicate_aliases)
-            .broken_wikilinks(vec![])
-            .build());
+    let broken_wikilinks_visitor = Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
+        &all_files,
+        &config.filename_to_alias,
+    )));
+    for file in all_files {
+        let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![broken_wikilinks_visitor.clone()];
+        parse(&mut parser, &file, visitors);
     }
+    let mut broken_wikilinks_visitor: BrokenWikilinkVisitor =
+        Rc::try_unwrap(broken_wikilinks_visitor)
+            .expect("visitors vector went out of scope")
+            .into_inner();
+    broken_wikilinks_visitor.finalize(&config.exclude);
 
-    let broken_wikilinks =
-        BrokenWikilink::calculate(get_files(config.directories.clone()).as_slice(), config)
-            .map_err(|e| miette!("From BrokenWikilink: {e}"))?
-            .filter_by_excludes(config.exclude.clone())
-            .dedupe_by_code();
-
-    // Return
     Ok(OutputReport::builder()
         .similar_filenames(similar_filenames)
-        .duplicate_aliases(duplicate_aliases)
-        .broken_wikilinks(broken_wikilinks)
+        .duplicate_aliases(
+            broken_wikilinks_visitor
+                .duplicate_alias_visitor
+                .duplicate_alias_errors,
+        )
+        .broken_wikilinks(broken_wikilinks_visitor.broken_wikilinks)
         .build())
 }

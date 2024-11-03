@@ -7,10 +7,11 @@ use crate::{
         content::wikilink::Alias,
         name::{Filename, FilenameLowercase},
     },
-    sed::{ReplacePair, ReplacePairError},
+    rules::ErrorCode,
+    sed::{ReplacePair, ReplacePairCompilationError},
 };
 
-use super::{Error, Partial};
+use super::{NewConfigError, Partial};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub(super) struct Config {
@@ -54,9 +55,10 @@ pub(super) struct Config {
 }
 
 impl Config {
-    pub fn new(path: &Path) -> Result<Self, Error> {
-        let contents = std::fs::read_to_string(path).map_err(Error::FileDoesNotReadError)?;
-        toml::from_str(&contents).map_err(Error::FileDoesNotParseError)
+    pub fn new(path: &Path) -> Result<Self, NewConfigError> {
+        let contents =
+            std::fs::read_to_string(path).map_err(NewConfigError::FileDoesNotReadError)?;
+        toml::from_str(&contents).map_err(NewConfigError::FileDoesNotParseError)
     }
 }
 
@@ -78,10 +80,6 @@ impl Partial for Config {
         self.boundary_pattern.clone()
     }
 
-    fn wikilink_pattern(&self) -> Option<String> {
-        self.wikilink_pattern.clone()
-    }
-
     fn filename_spacing_pattern(&self) -> Option<String> {
         self.filename_spacing_pattern.clone()
     }
@@ -90,42 +88,44 @@ impl Partial for Config {
         self.filename_match_threshold
     }
 
-    fn exclude(&self) -> Option<Vec<String>> {
+    fn exclude(&self) -> Option<Vec<ErrorCode>> {
         let out = self.exclude.clone();
         if out.is_empty() {
             None
         } else {
-            Some(out)
+            Some(out.into_iter().map(ErrorCode::new).collect())
         }
     }
 
     fn alias_to_filename(
         &self,
-    ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairError>> {
+    ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairCompilationError>> {
         let (to, from) = self.alias_to_filename.clone();
         match (to.is_empty(), from.is_empty()) {
             (true, true) => None,
             (false, false) => Some(ReplacePair::new(&to, &from)),
-            (true, false) => Some(Err(ReplacePairError::ToError(regex::Error::Syntax(
-                "To is empty".to_string(),
-            )))),
-            (false, true) => Some(Err(ReplacePairError::FromError(regex::Error::Syntax(
-                "From is empty".to_string(),
-            )))),
+            (true, false) => Some(Err(ReplacePairCompilationError::ToError(
+                regex::Error::Syntax("To is empty".to_string()),
+            ))),
+            (false, true) => Some(Err(ReplacePairCompilationError::FromError(
+                regex::Error::Syntax("From is empty".to_string()),
+            ))),
         }
     }
 
-    fn filename_to_alias(&self) -> Option<Result<ReplacePair<Filename, Alias>, ReplacePairError>> {
+    fn filename_to_alias(
+        &self,
+    ) -> Option<Result<ReplacePair<Filename, Alias>, ReplacePairCompilationError>> {
         let (to, from) = self.alias_to_filename.clone();
         match (to.is_empty(), from.is_empty()) {
             (true, true) => None,
             (false, false) => Some(ReplacePair::new(&to, &from)),
-            (true, false) => Some(Err(ReplacePairError::ToError(regex::Error::Syntax(
-                "To is empty".to_string(),
-            )))),
-            (false, true) => Some(Err(ReplacePairError::FromError(regex::Error::Syntax(
-                "From is empty".to_string(),
-            )))),
+            (true, false) => Some(Err(ReplacePairCompilationError::ToError(
+                regex::Error::Syntax("To is empty".to_string()),
+            ))),
+            (false, true) => Some(Err(ReplacePairCompilationError::FromError(
+                regex::Error::Syntax("From is empty".to_string()),
+            ))),
         }
     }
 }

@@ -1,11 +1,18 @@
-use crate::{file::name::get_filename, ngrams::Ngram, rules::HasId, sed::MissingSubstringError};
+use crate::{
+    file::name::get_filename,
+    ngrams::{MissingSubstringError, Ngram},
+    rules::HasId,
+};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use hashbrown::HashMap;
 use indicatif::ProgressBar;
 use miette::{Diagnostic, SourceOffset, SourceSpan};
 use regex::Regex;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+
+use super::ErrorCode;
 
 pub const CODE: &str = "name::similar";
 
@@ -14,7 +21,7 @@ pub const CODE: &str = "name::similar";
 #[diagnostic(code("name::similar"))]
 pub struct SimilarFilename {
     /// Used to identify the diagnostic and exclude it if needed
-    id: String,
+    id: ErrorCode,
 
     score: i64,
 
@@ -44,7 +51,7 @@ impl PartialEq for SimilarFilename {
 }
 
 impl HasId for SimilarFilename {
-    fn id(&self) -> String {
+    fn id(&self) -> ErrorCode {
         self.id.clone()
     }
 }
@@ -116,7 +123,7 @@ impl SimilarFilename {
             "Maybe you should combine them into a single file?\nThe score was: {score:?}\nid: {id:?}"
         );
         Ok(Self {
-            id,
+            id: id.into(),
             score,
             filepaths,
             file1_ngram,
@@ -126,7 +133,7 @@ impl SimilarFilename {
     }
 
     pub fn calculate(
-        file_ngrams: &std::collections::HashMap<Ngram, PathBuf>,
+        file_ngrams: &HashMap<Ngram, PathBuf>,
         filename_match_threshold: i64,
         spacing_regex: &Regex,
     ) -> Result<Vec<SimilarFilename>, MissingSubstringError> {

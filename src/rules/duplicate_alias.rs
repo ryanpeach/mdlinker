@@ -1,19 +1,20 @@
-use std::{collections::HashMap, path::PathBuf};
-
+use hashbrown::{HashMap, HashSet};
 use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
+use std::path::PathBuf;
 use thiserror::Error;
+use tree_sitter::Node;
 
 use crate::{
-    config::Config,
     file::{
-        self,
-        content::{from_file, wikilink::Alias},
+        content::{front_matter::FrontMatterVisitor, wikilink::Alias},
         name::{get_filename, Filename},
     },
-    sed::{MissingSubstringError, ReplacePairError},
+    ngrams::MissingSubstringError,
+    sed::{ReplacePair, ReplacePairCompilationError},
+    visitor::{FinalizeError, Visitor},
 };
 
-use super::HasId;
+use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId};
 
 pub const CODE: &str = "name::alias::duplicate";
 
@@ -23,7 +24,7 @@ pub const CODE: &str = "name::alias::duplicate";
 pub enum DuplicateAlias {
     FileNameContentDuplicate {
         /// Used to identify the diagnostic and exclude it if needed
-        id: String,
+        id: ErrorCode,
 
         /// The filename the alias contradicts with
         other_filename: Filename,
@@ -42,7 +43,7 @@ pub enum DuplicateAlias {
     },
     FileContentContentDuplicate {
         /// Used to identify the diagnostic and exclude it if needed
-        id: String,
+        id: ErrorCode,
 
         /// The filename which contains the other duplicate alias
         other_filename: Filename,
@@ -62,7 +63,7 @@ pub enum DuplicateAlias {
 }
 
 impl HasId for DuplicateAlias {
-    fn id(&self) -> String {
+    fn id(&self) -> ErrorCode {
         match self {
             DuplicateAlias::FileNameContentDuplicate { id: code, .. }
             | DuplicateAlias::FileContentContentDuplicate { id: code, .. } => code.clone(),
@@ -76,39 +77,127 @@ impl PartialEq for DuplicateAlias {
     }
 }
 
+impl PartialOrd for DuplicateAlias {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.id().partial_cmp(&other.id())
+    }
+}
+
+#[derive(Debug)]
+pub struct DuplicateAliasVisitor {
+    /// Put an alias in get a file that contains that alias (or is named after the alias) out
+    /// Also useful for telling you if you have seen this alias before
+    pub alias_table: HashMap<Alias, PathBuf>,
+    /// These are the duplicate alias diagnostics for miette
+    pub duplicate_alias_errors: Vec<DuplicateAlias>,
+    /// This is just the duplicate aliases themselves, useful for downstream tasks
+    pub duplicate_aliases: HashSet<Alias>,
+    /// Our main visitor, helps us get aliases from files, needs to be reset each file
+    front_matter_visitor: FrontMatterVisitor,
+    /// Just need to strore this for later to get aliases from filenames
+    filename_to_alias: ReplacePair<Filename, Alias>,
+}
+
+impl DuplicateAliasVisitor {
+    pub const NODE_KIND: &'static str = "alias";
+
+    #[must_use]
+    pub fn new(all_files: &Vec<PathBuf>, filename_to_alias: &ReplacePair<Filename, Alias>) -> Self {
+        // First collect the files in the directories as aliases
+        let mut alias_table = HashMap::new();
+        for file in all_files {
+            let filename = get_filename(file.as_path());
+            let alias = Alias::from_filename(&filename, filename_to_alias);
+            alias_table.insert(alias, file.clone());
+        }
+        Self {
+            alias_table,
+            duplicate_alias_errors: Vec::new(),
+            duplicate_aliases: HashSet::new(),
+            front_matter_visitor: FrontMatterVisitor::new(),
+            filename_to_alias: filename_to_alias.clone(),
+        }
+    }
+}
+
+impl Visitor for DuplicateAliasVisitor {
+    fn visit(&mut self, node: &Node, source: &str) {
+        if node.kind() == FrontMatterVisitor::NODE_KIND {
+            self.front_matter_visitor.visit(node, source);
+        }
+    }
+    fn finalize_file(&mut self, source: &str, path: &PathBuf) -> Result<(), FinalizeError> {
+        // We can "take" the aliases from the front_matter_visitor since we are going to clear them
+        let aliases = std::mem::take(&mut self.front_matter_visitor.aliases);
+        for alias in aliases {
+            // This inserts the alias into the table and returns the previous value if it existed
+            // If it did exist, we have a duplicate
+            // If it did not exist, we have a new alias in our table
+            if let Some(out) = self.alias_table.insert(alias.clone(), path.clone()) {
+                self.duplicate_aliases.insert(alias.clone());
+                self.duplicate_alias_errors.push(DuplicateAlias::new(
+                    &alias,
+                    path,
+                    source,
+                    &out,
+                    &self.filename_to_alias,
+                )?);
+            }
+        }
+
+        // Call finalize_file on the other visitors
+        self.front_matter_visitor.finalize_file(source, path);
+        Ok(())
+    }
+    fn finalize(&mut self, excludes: &Vec<ErrorCode>) -> Result<(), FinalizeError> {
+        // We can "take" the duplicate from the front_matter_visitor since we are going to put them
+        // right back in after some cleaning
+        self.duplicate_alias_errors = dedupe_by_code(filter_by_excludes(
+            std::mem::take(&mut self.duplicate_alias_errors),
+            excludes,
+        ));
+        self.front_matter_visitor.finalize(&excludes)?;
+        Ok(())
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum NewDuplicateAliasError {
     #[error(transparent)]
     MissingSubstringError(#[from] MissingSubstringError),
     #[error(transparent)]
-    ReplacePairError(#[from] ReplacePairError),
+    ReplacePairError(#[from] ReplacePairCompilationError),
     #[error("The file {filename} contains its own alias {alias}")]
     AliasAndFilenameSame { filename: Filename, alias: Alias },
 }
-
-#[derive(Error, Debug)]
-pub enum CalculateError {
-    #[error(transparent)]
-    MissingSubstringError(#[from] MissingSubstringError),
-    #[error(transparent)]
-    ReplacePairError(#[from] ReplacePairError),
-    #[error(transparent)]
-    FileError(#[from] file::Error),
-    #[error(transparent)]
-    NewDuplicateAliasError(#[from] NewDuplicateAliasError),
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-}
-
+//
+// #[derive(Error, Debug)]
+// pub enum CalculateError {
+//     #[error(transparent)]
+//     MissingSubstringError(#[from] MissingSubstringError),
+//     #[error(transparent)]
+//     ReplacePairError(#[from] ReplacePairCompilationError),
+//     #[error(transparent)]
+//     FileError(#[from] file::Error),
+//     #[error(transparent)]
+//     NewDuplicateAliasError(#[from] NewDuplicateAliasError),
+//     #[error(transparent)]
+//     IoError(#[from] std::io::Error),
+// }
+//
 impl DuplicateAlias {
     /// Create a new diagnostic
     /// based on the two filenames and their similar ngrams
     ///
+    /// File1 [`alias`] has been determined to be in file2
+    ///
+    ///
     pub fn new(
         alias: &Alias,
-        config: &Config,
         file1_path: &PathBuf,
+        file1_content: &str,
         file2_path: &PathBuf,
+        filename_to_alias: &ReplacePair<Filename, Alias>,
     ) -> Result<Self, NewDuplicateAliasError> {
         // Boundary conditions
         if file1_path == file2_path {
@@ -121,7 +210,7 @@ impl DuplicateAlias {
         // Create the unique id
         let id = format!("{CODE}::{alias}");
 
-        if Alias::from_filename(&get_filename(file1_path), config)? == *alias {
+        if Alias::from_filename(&get_filename(file1_path), &filename_to_alias) == *alias {
             let file2_content =
                 std::fs::read_to_string(file2_path).expect("File reported as existing");
             // Find the alias
@@ -139,18 +228,17 @@ impl DuplicateAlias {
             );
 
             Ok(DuplicateAlias::FileNameContentDuplicate {
-                id,
+                id: id.into(),
                 other_filename: get_filename(file1_path),
                 src: NamedSource::new(file2_path.to_string_lossy(), file2_content),
                 alias: file2_content_span,
                 advice: format!("Delete the alias from {}", file2_path.to_string_lossy()),
             })
-        } else if Alias::from_filename(&get_filename(file2_path), config)? == *alias {
-            // This is the same as above just with path 1 and 2 flipped
-            Self::new(alias, config, file2_path, file1_path)
+        } else if Alias::from_filename(&get_filename(file2_path), &filename_to_alias) == *alias {
+            unreachable!(
+                "This should no longer be a reachable case given the calling functions behavior"
+            )
         } else {
-            let file1_content =
-                std::fs::read_to_string(file1_path).expect("File reported as existing");
             let file2_content =
                 std::fs::read_to_string(file2_path).expect("File reported as existing");
 
@@ -185,12 +273,12 @@ impl DuplicateAlias {
             );
 
             Ok(DuplicateAlias::FileContentContentDuplicate {
-                id: id.clone(),
+                id: id.clone().into(),
                 other_filename: get_filename(file2_path),
-                src: NamedSource::new(file1_path.to_string_lossy(), file1_content),
+                src: NamedSource::new(file1_path.to_string_lossy(), file1_content.to_string()),
                 alias: file1_content_span,
                 other: vec![DuplicateAlias::FileContentContentDuplicate {
-                    id,
+                    id: id.into(),
                     other_filename: get_filename(file1_path),
                     src: NamedSource::new(file2_path.to_string_lossy(), file2_content),
                     alias: file2_content_span,
@@ -199,36 +287,19 @@ impl DuplicateAlias {
             })
         }
     }
-
-    pub fn calculate(
-        files: Vec<PathBuf>,
-        config: &Config,
-    ) -> Result<Vec<DuplicateAlias>, CalculateError> {
-        Ok(Self::get_alias_to_path_table_and_duplicates(files, config)?.1)
-    }
-
-    /// This is a helper function for both [`crate::rules::broken_wikilink::BrokenWikilink`] and [`Self::calculate`]
-    pub fn get_alias_to_path_table_and_duplicates(
-        files: Vec<PathBuf>,
-        config: &Config,
-    ) -> Result<(HashMap<Alias, PathBuf>, Vec<DuplicateAlias>), CalculateError> {
-        // First we need to collect all the file names and and aliases and collect a lookup table
-        // relating the string and the path to the file
-        // We may hit a duplicate alias, if so we need to collect all of them and stop
-        let mut lookup_table = HashMap::<Alias, PathBuf>::new();
-        let mut duplicates: Vec<DuplicateAlias> = Vec::new();
-        for file_path in files {
-            let filename = get_filename(file_path.as_path());
-            let filename_alias = Alias::from_filename(&filename, config)?;
-            lookup_table.insert(filename_alias, file_path.clone());
-            let front_matter =
-                from_file(file_path.clone(), config.wikilink_pattern.clone())?.front_matter;
-            for alias in front_matter.aliases {
-                if let Some(out) = lookup_table.insert(alias.clone(), file_path.clone()) {
-                    duplicates.push(DuplicateAlias::new(&alias, config, &out, &file_path)?);
-                }
-            }
-        }
-        Ok((lookup_table, duplicates))
-    }
 }
+
+//     pub fn calculate(
+//         files: Vec<PathBuf>,
+//         config: &Config,
+//     ) -> Result<Vec<DuplicateAlias>, CalculateError> {
+//         Ok(Self::get_alias_to_path_table_and_duplicates(files, config)?.1)
+//     }
+//
+//     /// This is a helper function for both [`crate::rules::broken_wikilink::BrokenWikilink`] and [`Self::calculate`]
+//     pub fn get_alias_to_path_table_and_duplicates(
+//         files: Vec<PathBuf>,
+//         config: &Config,
+//     ) -> Result<(HashMap<Alias, PathBuf>, Vec<DuplicateAlias>), CalculateError> {
+//     }
+// }

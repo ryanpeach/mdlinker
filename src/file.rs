@@ -6,13 +6,12 @@ use thiserror::Error;
 
 use std;
 
-use crate::sed::RegexError;
-
 pub mod content;
 pub mod name;
+mod treesitter;
 
 /// Walk the directories and get just the files
-pub fn get_files(dirs: Vec<PathBuf>) -> Vec<PathBuf> {
+pub fn get_files(dirs: &Vec<PathBuf>) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for path in dirs {
         let walk = WalkDir::new(path);
@@ -23,18 +22,4 @@ pub fn get_files(dirs: Vec<PathBuf>) -> Vec<PathBuf> {
         }
     }
     out
-}
-
-/// A bunch of bad things can happen while you're reading files,
-/// This covers most of them.
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Error reading the file.")]
-    IoError(#[from] std::io::Error),
-    #[error("Error parsing the yaml based on expected template.")]
-    SerdeError(#[from] serde_yaml::Error),
-    #[error("Found duplicate property {0} in file contents")]
-    DuplicateProperty(String),
-    #[error("Regex error: {0}")]
-    RegexError(#[from] RegexError),
 }

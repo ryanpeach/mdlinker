@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use mdlinker::rules::duplicate_alias;
 
+use mdlinker::rules::filter_code;
 use mdlinker::rules::VecHasIdExtensions;
 
 use crate::common::get_report;
@@ -29,12 +30,13 @@ fn filename_alias_relation() {
     for duplicate_alias in &report.duplicate_aliases {
         println!("{duplicate_alias:?}");
     }
-    let duplicate = report
-        .duplicate_aliases
-        .contains_code(&format!("{}::lorem", duplicate_alias::CODE))
-        .into_iter()
-        .at_most_one()
-        .unwrap();
+    let duplicate = filter_code(
+        report.duplicate_aliases,
+        &format!("{}::lorem", duplicate_alias::CODE).into(),
+    )
+    .into_iter()
+    .at_most_one()
+    .unwrap();
     assert!(duplicate.is_some());
 }
 
@@ -44,11 +46,12 @@ fn filecontent_filecontent_relation() {
     for duplicate_alias in &report.duplicate_aliases {
         println!("{duplicate_alias:?}");
     }
-    let duplicate = report
-        .duplicate_aliases
-        .contains_code(&format!("{}::dolor", duplicate_alias::CODE))
-        .into_iter()
-        .at_most_one()
-        .unwrap();
+    let duplicate = filter_code(
+        report.duplicate_aliases,
+        &format!("{}::dolor", duplicate_alias::CODE).into(),
+    )
+    .into_iter()
+    .at_most_one()
+    .unwrap();
     assert!(duplicate.is_some());
 }
