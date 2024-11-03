@@ -9,7 +9,6 @@ use crate::{
 };
 use comrak::{arena_tree::Node, nodes::Ast};
 use hashbrown::{HashMap, HashSet};
-use log::debug;
 use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
 use std::{
     cell::RefCell,
@@ -259,7 +258,6 @@ impl DuplicateAlias {
             )
         } else {
             // Find the alias
-            debug!("Finding the alias: {}", alias);
             let file1_content_found = file1_content
                 .to_lowercase()
                 .find(&alias.to_string())

@@ -18,7 +18,7 @@ fn number_of_broken_wikilinks() {
     for broken_wikilink in &report.broken_wikilinks {
         println!("{broken_wikilink:?}");
     }
-    assert_eq!(report.broken_wikilinks.len(), 3);
+    assert_eq!(report.broken_wikilinks.len(), 4);
 }
 
 /// This passes because the link is valid
@@ -104,6 +104,36 @@ fn consectetur_does_not_exist_and_is_tag() {
     assert!(!filter_code(
         report.broken_wikilinks,
         &format!("{}::2024_11_01::consectetur", broken_wikilink::CODE).into()
+    )
+    .is_empty());
+}
+
+/// This fails because the link is invalid
+/// This is a regular tag gut on another line, just testing .decendants work
+#[test]
+fn adipiscing_does_not_exist_and_is_tag() {
+    let report = get_report(PATHS.as_slice());
+    for broken_wikilink in &report.broken_wikilinks {
+        println!("{broken_wikilink:?}");
+    }
+    assert!(!filter_code(
+        report.broken_wikilinks,
+        &format!("{}::2024_11_01::adipiscing", broken_wikilink::CODE).into()
+    )
+    .is_empty());
+}
+
+/// This fails because the link is invalid
+/// This is a regular tag gut on another line, just testing .decendants work
+#[test]
+fn elit_exists_and_is_tag() {
+    let report = get_report(PATHS.as_slice());
+    for broken_wikilink in &report.broken_wikilinks {
+        println!("{broken_wikilink:?}");
+    }
+    assert!(filter_code(
+        report.broken_wikilinks,
+        &format!("{}::2024_11_01::elit", broken_wikilink::CODE).into()
     )
     .is_empty());
 }
