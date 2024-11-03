@@ -18,9 +18,9 @@ A linter whose goal is to lint wikilinks in a variety of markdown note taking ap
 
 - [X] Logseq Folder Structure
 - [X] Yaml Front Matter
-- [X] Logseq Aliases
+- [X] Logseq Aliases (in Yaml Front Matter)
 - [X] `[[title]]` Wikilinks
+- [X] #[[title]] tags
 - [ ] #title tags
-- [ ] #[[title]] tags
 - [ ] Obsidian Folder Structure
 - [ ] Obsidian Aliases

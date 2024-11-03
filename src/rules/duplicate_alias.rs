@@ -1,12 +1,3 @@
-use comrak::{arena_tree::Node, nodes::Ast};
-use hashbrown::{HashMap, HashSet};
-use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
-use std::{
-    cell::RefCell,
-    path::{Path, PathBuf},
-};
-use thiserror::Error;
-
 use crate::{
     file::{
         content::{front_matter::FrontMatterVisitor, wikilink::Alias},
@@ -16,6 +7,15 @@ use crate::{
     sed::{ReplacePair, ReplacePairCompilationError},
     visitor::{FinalizeError, VisitError, Visitor},
 };
+use comrak::{arena_tree::Node, nodes::Ast};
+use hashbrown::{HashMap, HashSet};
+use log::debug;
+use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+};
+use thiserror::Error;
 
 use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId};
 
@@ -203,6 +203,7 @@ impl DuplicateAlias {
         file2_content: Option<&str>,
         filename_to_alias: &ReplacePair<Filename, Alias>,
     ) -> Result<Self, NewDuplicateAliasError> {
+        assert!(!alias.to_string().is_empty());
         // Boundary conditions
         if file1_path == file2_path {
             return Err(NewDuplicateAliasError::AliasAndFilenameSame {
@@ -225,14 +226,14 @@ impl DuplicateAlias {
 
         if Alias::from_filename(&get_filename(file1_path), filename_to_alias) == *alias {
             // Find the alias
-            let file2_content_found =
-                file2_content
-                    .find(&alias.to_string())
-                    .ok_or_else(|| MissingSubstringError {
-                        path: file2_path.to_path_buf(),
-                        ngram: alias.to_string(),
-                        backtrace: std::backtrace::Backtrace::capture(),
-                    })?;
+            let file2_content_found = file2_content
+                .to_lowercase()
+                .find(&alias.to_string())
+                .ok_or_else(|| MissingSubstringError {
+                    path: file2_path.to_path_buf(),
+                    ngram: alias.to_string(),
+                    backtrace: std::backtrace::Backtrace::capture(),
+                })?;
 
             // Generate the spans relative to the NamedSource
             let file2_content_span = SourceSpan::new(
@@ -258,6 +259,7 @@ impl DuplicateAlias {
             )
         } else {
             // Find the alias
+            debug!("Finding the alias: {}", alias);
             let file1_content_found = file1_content
                 .to_lowercase()
                 .find(&alias.to_string())

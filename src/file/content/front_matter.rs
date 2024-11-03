@@ -1,20 +1,21 @@
 use std::{cell::RefCell, path::Path};
 
+use crate::{
+    rules::ErrorCode,
+    visitor::{VisitError, Visitor},
+};
 use comrak::{
     arena_tree::Node,
     nodes::{Ast, NodeValue},
 };
 use serde::Deserialize;
 
-use crate::{
-    rules::ErrorCode,
-    visitor::{VisitError, Visitor},
-};
-
 use super::wikilink::Alias;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
+#[serde(default)]
 pub struct YamlFrontMatter {
+    #[serde(default)]
     pub alias: String,
 }
 
@@ -35,11 +36,16 @@ impl Visitor for FrontMatterVisitor {
     fn visit(&mut self, node: &Node<RefCell<Ast>>, _source: &str) -> Result<(), VisitError> {
         if let NodeValue::FrontMatter(text) = &node.data.borrow().value {
             // Strip off first and last line for --- delimeters
-            let lines: Vec<&str> = text.lines().collect();
+            let lines: Vec<&str> = text.trim().lines().collect();
             let trimmed_lines = &lines[1..lines.len() - 1];
             let text = trimmed_lines.join("\n");
-
+            if text.is_empty() {
+                return Ok(());
+            }
             let YamlFrontMatter { alias } = serde_yaml::from_str::<YamlFrontMatter>(&text)?;
+            if alias.is_empty() {
+                return Ok(());
+            }
             for alias in alias.split(',') {
                 self.aliases.push(Alias::new(alias.trim()));
             }

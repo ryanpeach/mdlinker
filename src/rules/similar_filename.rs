@@ -177,13 +177,6 @@ impl SimilarFilename {
                 let score = matcher.fuzzy_match(&ngram.to_string(), &other_ngram.to_string());
                 if let Some(score) = score {
                     if score > filename_match_threshold {
-                        log::info!("Match! {:?} and {:?}", filepath, other_filepath);
-                        log::debug!(
-                            "Ngrams: '{}' and '{}', Score: {:?}",
-                            ngram,
-                            other_ngram,
-                            score
-                        );
                         matches.push(SimilarFilename::new(
                             filepath,
                             ngram,
@@ -194,8 +187,6 @@ impl SimilarFilename {
                         )?);
                         break;
                     }
-                } else {
-                    log::debug!("No match: {} and {}", ngram, other_ngram);
                 }
             }
         }

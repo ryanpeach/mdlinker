@@ -3,11 +3,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use bon::Builder;
-use comrak::{arena_tree::Node, nodes::Ast};
-use miette::{Diagnostic, NamedSource, Result, SourceSpan};
-use thiserror::Error;
-
 use crate::{
     file::{
         content::wikilink::{Alias, WikilinkVisitor},
@@ -16,10 +11,14 @@ use crate::{
     sed::ReplacePair,
     visitor::{FinalizeError, VisitError, Visitor},
 };
+use bon::Builder;
+use comrak::{arena_tree::Node, nodes::Ast};
+use hashbrown::HashMap;
+use log::debug;
+use miette::{Diagnostic, NamedSource, Result, SourceSpan};
+use thiserror::Error;
 
-use super::{
-    dedupe_by_code, duplicate_alias::DuplicateAliasVisitor, filter_by_excludes, ErrorCode, HasId,
-};
+use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId};
 
 pub const CODE: &str = "content::wikilink::broken";
 
@@ -60,16 +59,20 @@ impl HasId for BrokenWikilink {
 
 #[derive(Debug)]
 pub struct BrokenWikilinkVisitor {
-    pub duplicate_alias_visitor: DuplicateAliasVisitor,
+    pub alias_table: HashMap<Alias, PathBuf>,
     pub wikilinks_visitor: WikilinkVisitor,
     pub broken_wikilinks: Vec<BrokenWikilink>,
 }
 
 impl BrokenWikilinkVisitor {
     #[must_use]
-    pub fn new(all_files: &Vec<PathBuf>, filename_to_alias: &ReplacePair<Filename, Alias>) -> Self {
+    pub fn new(
+        _all_files: &[PathBuf],
+        _filename_to_alias: &ReplacePair<Filename, Alias>,
+        alias_table: HashMap<Alias, PathBuf>,
+    ) -> Self {
         Self {
-            duplicate_alias_visitor: DuplicateAliasVisitor::new(all_files, filename_to_alias),
+            alias_table,
             wikilinks_visitor: WikilinkVisitor::new(),
             broken_wikilinks: Vec::new(),
         }
@@ -78,7 +81,6 @@ impl BrokenWikilinkVisitor {
 
 impl Visitor for BrokenWikilinkVisitor {
     fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
-        self.duplicate_alias_visitor.visit(node, source)?;
         self.wikilinks_visitor.visit(node, source)?;
         Ok(())
     }
@@ -87,13 +89,12 @@ impl Visitor for BrokenWikilinkVisitor {
         source: &str,
         path: &Path,
     ) -> std::result::Result<(), FinalizeError> {
-        self.duplicate_alias_visitor.finalize_file(source, path)?;
-        let lookup_table = &self.duplicate_alias_visitor.alias_table;
         let filename = get_filename(path).lowercase();
         let wikilinks = self.wikilinks_visitor.wikilinks.clone();
         for wikilink in wikilinks {
             let alias = wikilink.alias;
-            if !lookup_table.contains_key(&alias) {
+            if !self.alias_table.contains_key(&alias) {
+                debug!("Broken wikilink: {}", alias);
                 self.broken_wikilinks.push(
                     BrokenWikilink::builder()
                         .id(format!("{CODE}::{filename}::{alias}").into())
@@ -118,7 +119,6 @@ impl Visitor for BrokenWikilinkVisitor {
             excludes,
         ));
         self.wikilinks_visitor.finalize(excludes)?;
-        self.duplicate_alias_visitor.finalize(excludes)?;
         Ok(())
     }
 }

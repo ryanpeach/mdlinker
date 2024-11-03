@@ -14,7 +14,7 @@ use file::{get_files, name::ngrams};
 use miette::{miette, Result};
 use rules::{
     broken_wikilink::{BrokenWikilink, BrokenWikilinkVisitor},
-    duplicate_alias::DuplicateAlias,
+    duplicate_alias::{DuplicateAlias, DuplicateAliasVisitor},
     similar_filename::SimilarFilename,
 };
 use visitor::{parse, Visitor};
@@ -72,13 +72,32 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
     .map_err(|e| miette!("From SimilarFilename: {e}"))?
     .finalize(&config.exclude);
 
-    let broken_wikilinks_visitor = Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
+    //  The duplicate alias visitor has to run first to get the table of aliases
+    let duplicate_alias_visitor = Rc::new(RefCell::new(DuplicateAliasVisitor::new(
         &all_files,
         &config.filename_to_alias,
     )));
-    for file in all_files {
+    for file in &all_files {
+        let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![duplicate_alias_visitor.clone()];
+        parse(file, visitors).map_err(|e| miette!(e))?;
+    }
+    let mut duplicate_alias_visitor: DuplicateAliasVisitor =
+        Rc::try_unwrap(duplicate_alias_visitor)
+            .expect("visitors vector went out of scope")
+            .into_inner();
+    duplicate_alias_visitor
+        .finalize(&config.exclude)
+        .map_err(|e| miette!(e))?;
+
+    // The broken wikilinks visitor
+    let broken_wikilinks_visitor = Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
+        &all_files,
+        &config.filename_to_alias,
+        duplicate_alias_visitor.alias_table,
+    )));
+    for file in &all_files {
         let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![broken_wikilinks_visitor.clone()];
-        parse(&file, visitors).map_err(|e| miette!(e))?;
+        parse(file, visitors).map_err(|e| miette!(e))?;
     }
     let mut broken_wikilinks_visitor: BrokenWikilinkVisitor =
         Rc::try_unwrap(broken_wikilinks_visitor)
@@ -90,11 +109,7 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
 
     Ok(OutputReport::builder()
         .similar_filenames(similar_filenames)
-        .duplicate_aliases(
-            broken_wikilinks_visitor
-                .duplicate_alias_visitor
-                .duplicate_alias_errors,
-        )
+        .duplicate_aliases(duplicate_alias_visitor.duplicate_alias_errors)
         .broken_wikilinks(broken_wikilinks_visitor.broken_wikilinks)
         .build())
 }
