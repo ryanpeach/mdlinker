@@ -65,3 +65,4 @@ impl<T: HasId + PartialOrd> VecHasIdExtensions<T> for Vec<T> {
 pub mod broken_wikilink;
 pub mod duplicate_alias;
 pub mod similar_filename;
+pub mod unlinked_text;

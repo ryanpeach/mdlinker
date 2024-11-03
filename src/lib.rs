@@ -16,6 +16,7 @@ use rules::{
     broken_wikilink::{BrokenWikilink, BrokenWikilinkVisitor},
     duplicate_alias::{DuplicateAlias, DuplicateAliasVisitor},
     similar_filename::SimilarFilename,
+    unlinked_text::UnlinkedText,
 };
 use visitor::{parse, Visitor};
 
@@ -28,6 +29,7 @@ pub struct OutputReport {
     pub similar_filenames: Vec<SimilarFilename>,
     pub duplicate_aliases: Vec<DuplicateAlias>,
     pub broken_wikilinks: Vec<BrokenWikilink>,
+    pub unlinked_texts: Vec<UnlinkedText>,
 }
 
 impl OutputReport {
@@ -93,17 +95,34 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
     let broken_wikilinks_visitor = Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
         &all_files,
         &config.filename_to_alias,
-        duplicate_alias_visitor.alias_table,
+        duplicate_alias_visitor.alias_table.clone(),
     )));
+    let unlinked_text_visitor = Rc::new(RefCell::new(
+        rules::unlinked_text::UnlinkedTextVisitor::new(
+            &all_files,
+            &config.filename_to_alias,
+            duplicate_alias_visitor.alias_table,
+        ),
+    ));
     for file in &all_files {
-        let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![broken_wikilinks_visitor.clone()];
+        let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![
+            broken_wikilinks_visitor.clone(),
+            unlinked_text_visitor.clone(),
+        ];
         parse(file, visitors).map_err(|e| miette!(e))?;
     }
     let mut broken_wikilinks_visitor: BrokenWikilinkVisitor =
         Rc::try_unwrap(broken_wikilinks_visitor)
             .expect("visitors vector went out of scope")
             .into_inner();
+    let mut unlinked_text_visitor: rules::unlinked_text::UnlinkedTextVisitor =
+        Rc::try_unwrap(unlinked_text_visitor)
+            .expect("visitors vector went out of scope")
+            .into_inner();
     broken_wikilinks_visitor
+        .finalize(&config.exclude)
+        .map_err(|e| miette!(e))?;
+    unlinked_text_visitor
         .finalize(&config.exclude)
         .map_err(|e| miette!(e))?;
 
@@ -111,5 +130,6 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
         .similar_filenames(similar_filenames)
         .duplicate_aliases(duplicate_alias_visitor.duplicate_alias_errors)
         .broken_wikilinks(broken_wikilinks_visitor.broken_wikilinks)
+        .unlinked_texts(unlinked_text_visitor.unlinked_texts)
         .build())
 }

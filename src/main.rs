@@ -26,6 +26,10 @@ fn main() -> Result<()> {
                 nb_errors += 1;
                 eprintln!("{:?}", Report::from(error));
             }
+            for error in e.unlinked_texts {
+                nb_errors += 1;
+                eprintln!("{:?}", Report::from(error));
+            }
         }
     }
 
