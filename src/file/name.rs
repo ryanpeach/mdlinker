@@ -8,8 +8,6 @@ use regex::Regex;
 
 use crate::ngrams::{up_to_n, Ngram};
 
-use super::get_files;
-
 /// A filename is a representation of the file name in its original casing
 /// And with its original seperators
 /// but without its extension and without its path

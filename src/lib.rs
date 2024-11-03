@@ -5,7 +5,7 @@ pub mod rules;
 pub mod sed;
 pub mod visitor;
 
-use std::{cell::RefCell, fs, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use bon::Builder;
 use file::{get_files, name::ngrams};
@@ -68,7 +68,7 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
 
     // All our reports
     // NOTE: Always use `filter_by_excludes` and `dedupe_by_code` on the reports
-    let mut similar_filenames = SimilarFilename::calculate(
+    let similar_filenames = SimilarFilename::calculate(
         &file_ngrams,
         config.filename_match_threshold,
         &filename_spacing_regex,

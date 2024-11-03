@@ -4,12 +4,7 @@ use bon::Builder;
 use miette::SourceSpan;
 use tree_sitter::Node;
 
-use crate::{
-    config::Config,
-    file::name::Filename,
-    sed::{ReplacePair, ReplacePairCompilationError},
-    visitor::Visitor,
-};
+use crate::{file::name::Filename, sed::ReplacePair, visitor::Visitor};
 
 /// A linkable string, like that in a wikilink, or its corresponding filename
 /// Aliases are always lowercase
@@ -36,6 +31,7 @@ impl From<String> for Alias {
 }
 
 impl Alias {
+    #[must_use]
     pub fn from_filename(
         filename: &Filename,
         filename_to_alias: &ReplacePair<Filename, Alias>,
@@ -57,6 +53,7 @@ pub struct WikilinkVisitor {
 
 impl WikilinkVisitor {
     pub const NODE_KIND: &'static str = "wikilink";
+    #[must_use]
     pub fn new() -> Self {
         Self {
             wikilinks: Vec::new(),

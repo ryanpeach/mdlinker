@@ -6,12 +6,10 @@ use thiserror::Error;
 use tree_sitter::Node;
 
 use crate::{
-    config::Config,
     file::{
         content::wikilink::{Alias, WikilinkVisitor},
         name::{get_filename, Filename},
     },
-    rules::duplicate_alias::DuplicateAlias,
     sed::ReplacePair,
     visitor::{FinalizeError, Visitor},
 };
@@ -65,6 +63,7 @@ pub struct BrokenWikilinkVisitor {
 }
 
 impl BrokenWikilinkVisitor {
+    #[must_use]
     pub fn new(all_files: &Vec<PathBuf>, filename_to_alias: &ReplacePair<Filename, Alias>) -> Self {
         Self {
             duplicate_alias_visitor: DuplicateAliasVisitor::new(all_files, filename_to_alias),
@@ -115,10 +114,10 @@ impl Visitor for BrokenWikilinkVisitor {
         // We can "take" this because we are putting it right back
         self.broken_wikilinks = dedupe_by_code(filter_by_excludes(
             std::mem::take(&mut self.broken_wikilinks),
-            &excludes,
+            excludes,
         ));
-        self.wikilinks_visitor.finalize(&excludes)?;
-        self.duplicate_alias_visitor.finalize(&excludes)?;
+        self.wikilinks_visitor.finalize(excludes)?;
+        self.duplicate_alias_visitor.finalize(excludes)?;
         Ok(())
     }
 }

@@ -12,6 +12,7 @@ pub struct FrontMatterVisitor {
 
 impl FrontMatterVisitor {
     pub const NODE_KIND: &'static str = "alias";
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
