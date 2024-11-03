@@ -84,7 +84,6 @@ pub fn up_to_n(text: &str, n: usize, boundary_regex: &Regex, spacing_regex: &Reg
         for n in 1..=n {
             if words.len() >= n {
                 for i in 0..=words.len().saturating_sub(n) {
-                    log::debug!("words: {:?}, i: {:?}, size: {:?}", words, i, n);
                     let ngram = Ngram::new(&words[i..i + n]);
                     ngrams.push(ngram);
                 }

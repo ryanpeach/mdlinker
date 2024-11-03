@@ -96,7 +96,6 @@ pub fn ngrams(
             boundary_regex,
             filename_spacing_regex,
         );
-        log::debug!("Filename: {:?}, ngrams: {:?}", filename, ngrams.len());
         for ngram in ngrams {
             file_name_ngrams.insert(ngram, filepath.clone());
         }
