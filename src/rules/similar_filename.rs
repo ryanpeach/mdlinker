@@ -83,20 +83,18 @@ impl SimilarFilename {
         let find1 = spacing_regex
             .replace_all(&file1, " ")
             .find(&file1_ngram.to_string())
-            .ok_or_else(|| {
-                MissingSubstringError::builder()
-                    .path(file1_path.to_path_buf())
-                    .ngram(file1_ngram.to_string())
-                    .build()
+            .ok_or_else(|| MissingSubstringError {
+                path: file1_path.to_path_buf(),
+                ngram: file1_ngram.to_string(),
+                backtrace: std::backtrace::Backtrace::capture(),
             })?;
         let find2 = spacing_regex
             .replace_all(&file2, " ")
             .find(&file2_ngram.to_string())
-            .ok_or_else(|| {
-                MissingSubstringError::builder()
-                    .path(file2_path.to_path_buf())
-                    .ngram(file2_ngram.to_string())
-                    .build()
+            .ok_or_else(|| MissingSubstringError {
+                path: file2_path.to_path_buf(),
+                ngram: file2_ngram.to_string(),
+                backtrace: std::backtrace::Backtrace::capture(),
             })?;
 
         // Create the spans

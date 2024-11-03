@@ -71,12 +71,12 @@ pub fn get_filename(path: &Path) -> Filename {
         .file_name()
         .expect("We were given a guaranteed file path, not a directory")
         .to_string_lossy();
-    return Filename::new(
+    Filename::new(
         fname
             .split('.')
             .next()
             .expect("File paths will either have a file extension or not, it makes no difference"),
-    );
+    )
 }
 
 /// Generate n-grams from the filenames found in the directories

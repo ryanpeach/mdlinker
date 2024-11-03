@@ -3,15 +3,15 @@ use std::{
     path::PathBuf,
 };
 
-use bon::Builder;
 use regex::Regex;
 use thiserror::Error;
 
-#[derive(Error, Debug, Builder)]
+#[derive(Error, Debug)]
 #[error("{path} does not contain the ngram {ngram}")]
 pub struct MissingSubstringError {
     pub path: PathBuf,
     pub ngram: String,
+    pub backtrace: std::backtrace::Backtrace,
 }
 
 /// An ngram, " " seperated, lowercase
@@ -268,13 +268,11 @@ mod tests {
 
         #[test]
         fn test_up_to() {
+            let beoundary_regex = Regex::new(r"[,.]").expect("Just a test");
+            let spacing_regex = Regex::new(r" ").expect("Just a test");
             for n in (1..=3).rev() {
-                let up_to_out = HashSet::from_iter(up_to_n(
-                    LOREM_IPSUM,
-                    n,
-                    &Regex::new(r"[,.]").expect("Just a test"),
-                    &Regex::new(r" ").expect("Just a test"),
-                ));
+                let up_to_out =
+                    HashSet::from_iter(up_to_n(LOREM_IPSUM, n, &beoundary_regex, &spacing_regex));
                 let mut out = HashSet::new();
                 for m in 1..=n {
                     let to = ngrams(LOREM_IPSUM, m, r"[,.]");

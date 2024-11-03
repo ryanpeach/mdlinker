@@ -16,7 +16,11 @@ A linter whose goal is to lint wikilinks in a variety of markdown note taking ap
 
 # Compatibility
 
-- [X] Logseq
-- [ ] Obsidian
-- [ ] Roam
-- [ ] Joplin
+- [X] Logseq Folder Structure
+- [X] Yaml Front Matter
+- [X] Logseq Aliases
+- [X] `[[title]]` Wikilinks
+- [ ] #title tags
+- [ ] #[[title]] tags
+- [ ] Obsidian Folder Structure
+- [ ] Obsidian Aliases

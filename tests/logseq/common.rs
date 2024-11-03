@@ -15,5 +15,5 @@ pub fn get_report(paths: &[String]) -> mdlinker::OutputReport {
         )
         .build();
 
-    lib(&config).expect("Error within the library")
+    return lib(&config).expect("There should have been no error.");
 }
