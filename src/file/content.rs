@@ -1,18 +1,10 @@
-use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
+use std::path::PathBuf;
 
-use front_matter::FrontMatterVisitor;
-use tree_sitter::Parser;
-use wikilink::{Alias, Wikilink, WikilinkVisitor};
+use wikilink::{Alias, Wikilink};
 
-use crate::{
-    sed::{ReplacePair, ReplacePairCompilationError},
-    visitor::{parse, Visitor},
-};
+use crate::sed::ReplacePairCompilationError;
 
-use super::{
-    name::{get_filename, Filename},
-    Error,
-};
+use super::Error;
 
 pub mod front_matter;
 pub mod wikilink;

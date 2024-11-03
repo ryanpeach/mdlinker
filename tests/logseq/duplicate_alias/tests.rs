@@ -2,7 +2,6 @@ use lazy_static::lazy_static;
 use mdlinker::rules::duplicate_alias;
 
 use mdlinker::rules::filter_code;
-use mdlinker::rules::VecHasIdExtensions;
 
 use crate::common::get_report;
 

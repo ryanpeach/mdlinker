@@ -156,7 +156,7 @@ impl Visitor for DuplicateAliasVisitor {
             std::mem::take(&mut self.duplicate_alias_errors),
             excludes,
         ));
-        self.front_matter_visitor.finalize(&excludes)?;
+        self.front_matter_visitor.finalize(excludes)?;
         Ok(())
     }
 }
@@ -210,7 +210,7 @@ impl DuplicateAlias {
         // Create the unique id
         let id = format!("{CODE}::{alias}");
 
-        if Alias::from_filename(&get_filename(file1_path), &filename_to_alias) == *alias {
+        if Alias::from_filename(&get_filename(file1_path), filename_to_alias) == *alias {
             let file2_content =
                 std::fs::read_to_string(file2_path).expect("File reported as existing");
             // Find the alias
@@ -234,7 +234,7 @@ impl DuplicateAlias {
                 alias: file2_content_span,
                 advice: format!("Delete the alias from {}", file2_path.to_string_lossy()),
             })
-        } else if Alias::from_filename(&get_filename(file2_path), &filename_to_alias) == *alias {
+        } else if Alias::from_filename(&get_filename(file2_path), filename_to_alias) == *alias {
             unreachable!(
                 "This should no longer be a reachable case given the calling functions behavior"
             )

@@ -2,9 +2,6 @@
 //! Eventually actually replicating sed became to hard, so now
 //! I'm just using tuples of regex patterns
 
-use std::path::PathBuf;
-
-use bon::Builder;
 use regex::Regex;
 use thiserror::Error;
 
