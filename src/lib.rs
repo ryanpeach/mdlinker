@@ -1,3 +1,5 @@
+#![feature(error_generic_member_access)]
+
 pub mod config;
 pub mod file;
 pub mod ngrams;

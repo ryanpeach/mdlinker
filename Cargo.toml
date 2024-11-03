@@ -47,7 +47,7 @@ name = "logseq"
 debug = true
 
 [toolchain]
-channel = "stable"
+channel = "nightly"
 components = ["clippy"]
 
 # [lints.rust]

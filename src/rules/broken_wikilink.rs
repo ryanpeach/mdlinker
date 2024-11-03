@@ -1,9 +1,12 @@
-use std::path::{Path, PathBuf};
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+};
 
 use bon::Builder;
+use comrak::{arena_tree::Node, nodes::Ast};
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
 use thiserror::Error;
-use tree_sitter::Node;
 
 use crate::{
     file::{
@@ -11,7 +14,7 @@ use crate::{
         name::{get_filename, Filename},
     },
     sed::ReplacePair,
-    visitor::{FinalizeError, Visitor},
+    visitor::{FinalizeError, VisitError, Visitor},
 };
 
 use super::{
@@ -74,13 +77,10 @@ impl BrokenWikilinkVisitor {
 }
 
 impl Visitor for BrokenWikilinkVisitor {
-    fn visit(&mut self, node: &Node, source: &str) {
-        if node.kind() == DuplicateAliasVisitor::NODE_KIND {
-            self.duplicate_alias_visitor.visit(node, source);
-        }
-        if WikilinkVisitor::NODE_KINDS.contains(&node.kind()) {
-            self.wikilinks_visitor.visit(node, source);
-        }
+    fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
+        self.duplicate_alias_visitor.visit(node, source)?;
+        self.wikilinks_visitor.visit(node, source)?;
+        Ok(())
     }
     fn finalize_file(
         &mut self,
@@ -122,11 +122,3 @@ impl Visitor for BrokenWikilinkVisitor {
         Ok(())
     }
 }
-
-// impl BrokenWikilink {
-//     pub fn calculate(
-//         files: &[PathBuf],
-//         config: &Config,
-//     ) -> Result<Vec<BrokenWikilink>, CalculateError> {
-//     }
-// }

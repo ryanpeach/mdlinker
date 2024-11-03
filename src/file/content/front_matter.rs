@@ -34,6 +34,11 @@ impl FrontMatterVisitor {
 impl Visitor for FrontMatterVisitor {
     fn visit(&mut self, node: &Node<RefCell<Ast>>, _source: &str) -> Result<(), VisitError> {
         if let NodeValue::FrontMatter(text) = &node.data.borrow().value {
+            // Strip off first and last line for --- delimeters
+            let lines: Vec<&str> = text.lines().collect();
+            let trimmed_lines = &lines[1..lines.len() - 1];
+            let text = trimmed_lines.join("\n");
+
             let YamlFrontMatter { alias } = serde_yaml::from_str::<YamlFrontMatter>(&text)?;
             for alias in alias.split(',') {
                 self.aliases.push(Alias::new(alias.trim()));

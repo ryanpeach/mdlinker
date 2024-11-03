@@ -14,8 +14,13 @@ use crate::rules::{duplicate_alias::NewDuplicateAliasError, ErrorCode};
 
 #[derive(Error, Debug)]
 pub enum VisitError {
-    #[error(transparent)]
-    FrontMatterDeserializeError(#[from] serde_yaml::Error),
+    #[error("Error deserializing the node")]
+    FrontMatterDeserializeError {
+        #[from]
+        source: serde_yaml::Error,
+        #[backtrace]
+        backtrace: std::backtrace::Backtrace,
+    },
 }
 
 #[derive(Error, Debug)]
@@ -71,14 +76,14 @@ pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<
     // Visit the root
     for visitor in visitors.clone() {
         let mut visitor_cell = (*visitor).borrow_mut();
-        visitor_cell.visit(&root, &source);
+        visitor_cell.visit(root, &source)?;
     }
 
     // Pass the node to all the visitors
     for node in root.descendants() {
         for visitor in visitors.clone() {
             let mut visitor_cell = (*visitor).borrow_mut();
-            visitor_cell.visit(&node, &source);
+            visitor_cell.visit(node, &source)?;
         }
     }
 

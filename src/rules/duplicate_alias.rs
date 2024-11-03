@@ -1,8 +1,11 @@
+use comrak::{arena_tree::Node, nodes::Ast};
 use hashbrown::{HashMap, HashSet};
 use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
-use std::path::{Path, PathBuf};
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
-use tree_sitter::Node;
 
 use crate::{
     file::{
@@ -11,7 +14,7 @@ use crate::{
     },
     ngrams::MissingSubstringError,
     sed::{ReplacePair, ReplacePairCompilationError},
-    visitor::{FinalizeError, Visitor},
+    visitor::{FinalizeError, VisitError, Visitor},
 };
 
 use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId};
@@ -121,10 +124,9 @@ impl DuplicateAliasVisitor {
 }
 
 impl Visitor for DuplicateAliasVisitor {
-    fn visit(&mut self, node: &Node, source: &str) {
-        if node.kind() == FrontMatterVisitor::NODE_KIND {
-            self.front_matter_visitor.visit(node, source);
-        }
+    fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
+        self.front_matter_visitor.visit(node, source)?;
+        Ok(())
     }
     fn finalize_file(&mut self, source: &str, path: &Path) -> Result<(), FinalizeError> {
         // We can "take" the aliases from the front_matter_visitor since we are going to clear them
@@ -138,8 +140,9 @@ impl Visitor for DuplicateAliasVisitor {
                 self.duplicate_alias_errors.push(DuplicateAlias::new(
                     &alias,
                     path,
-                    source,
+                    Some(source),
                     &out,
+                    None,
                     &self.filename_to_alias,
                 )?);
             }
@@ -195,8 +198,9 @@ impl DuplicateAlias {
     pub fn new(
         alias: &Alias,
         file1_path: &Path,
-        file1_content: &str,
+        file1_content: Option<&str>,
         file2_path: &Path,
+        file2_content: Option<&str>,
         filename_to_alias: &ReplacePair<Filename, Alias>,
     ) -> Result<Self, NewDuplicateAliasError> {
         // Boundary conditions
@@ -210,16 +214,25 @@ impl DuplicateAlias {
         // Create the unique id
         let id = format!("{CODE}::{alias}");
 
+        let file1_content = match file1_content {
+            None => &std::fs::read_to_string(file1_path).expect("File reported as existing"),
+            Some(content) => content,
+        };
+        let file2_content = match file2_content {
+            None => &std::fs::read_to_string(file2_path).expect("File reported as existing"),
+            Some(content) => content,
+        };
+
         if Alias::from_filename(&get_filename(file1_path), filename_to_alias) == *alias {
-            let file2_content =
-                std::fs::read_to_string(file2_path).expect("File reported as existing");
             // Find the alias
-            let file2_content_found = file2_content.find(&alias.to_string()).ok_or_else(|| {
-                MissingSubstringError::builder()
-                    .path(file2_path.to_path_buf())
-                    .ngram(alias.to_string())
-                    .build()
-            })?;
+            let file2_content_found =
+                file2_content
+                    .find(&alias.to_string())
+                    .ok_or_else(|| MissingSubstringError {
+                        path: file2_path.to_path_buf(),
+                        ngram: alias.to_string(),
+                        backtrace: std::backtrace::Backtrace::capture(),
+                    })?;
 
             // Generate the spans relative to the NamedSource
             let file2_content_span = SourceSpan::new(
@@ -230,36 +243,36 @@ impl DuplicateAlias {
             Ok(DuplicateAlias::FileNameContentDuplicate {
                 id: id.into(),
                 other_filename: get_filename(file1_path),
-                src: NamedSource::new(file2_path.to_string_lossy(), file2_content),
+                src: NamedSource::new(file2_path.to_string_lossy(), file2_content.to_string()),
                 alias: file2_content_span,
                 advice: format!("Delete the alias from {}", file2_path.to_string_lossy()),
             })
         } else if Alias::from_filename(&get_filename(file2_path), filename_to_alias) == *alias {
-            unreachable!(
-                "This should no longer be a reachable case given the calling functions behavior"
+            Self::new(
+                alias,
+                file2_path,
+                Some(file2_content),
+                file1_path,
+                Some(file1_content),
+                filename_to_alias,
             )
         } else {
-            let file2_content =
-                std::fs::read_to_string(file2_path).expect("File reported as existing");
-
             // Find the alias
             let file1_content_found = file1_content
                 .to_lowercase()
                 .find(&alias.to_string())
-                .ok_or_else(|| {
-                    MissingSubstringError::builder()
-                        .path(file1_path.to_path_buf())
-                        .ngram(alias.to_string())
-                        .build()
+                .ok_or_else(|| MissingSubstringError {
+                    path: file1_path.to_path_buf(),
+                    ngram: alias.to_string(),
+                    backtrace: std::backtrace::Backtrace::capture(),
                 })?;
             let file2_content_found = file2_content
                 .to_lowercase()
                 .find(&alias.to_string())
-                .ok_or_else(|| {
-                    MissingSubstringError::builder()
-                        .path(file2_path.to_path_buf())
-                        .ngram(alias.to_string())
-                        .build()
+                .ok_or_else(|| MissingSubstringError {
+                    path: file2_path.to_path_buf(),
+                    ngram: alias.to_string(),
+                    backtrace: std::backtrace::Backtrace::capture(),
                 })?;
 
             // Generate the spans relative to the NamedSource
@@ -280,7 +293,7 @@ impl DuplicateAlias {
                 other: vec![DuplicateAlias::FileContentContentDuplicate {
                     id: id.into(),
                     other_filename: get_filename(file1_path),
-                    src: NamedSource::new(file2_path.to_string_lossy(), file2_content),
+                    src: NamedSource::new(file2_path.to_string_lossy(), file2_content.to_string()),
                     alias: file2_content_span,
                     other: vec![],
                 }],
@@ -288,18 +301,3 @@ impl DuplicateAlias {
         }
     }
 }
-
-//     pub fn calculate(
-//         files: Vec<PathBuf>,
-//         config: &Config,
-//     ) -> Result<Vec<DuplicateAlias>, CalculateError> {
-//         Ok(Self::get_alias_to_path_table_and_duplicates(files, config)?.1)
-//     }
-//
-//     /// This is a helper function for both [`crate::rules::broken_wikilink::BrokenWikilink`] and [`Self::calculate`]
-//     pub fn get_alias_to_path_table_and_duplicates(
-//         files: Vec<PathBuf>,
-//         config: &Config,
-//     ) -> Result<(HashMap<Alias, PathBuf>, Vec<DuplicateAlias>), CalculateError> {
-//     }
-// }

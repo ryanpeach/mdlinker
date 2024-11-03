@@ -4,11 +4,17 @@ use std::{
 };
 
 use bon::Builder;
-use comrak::{arena_tree::Node, nodes::Ast};
-use miette::SourceSpan;
-use tree_sitter::Node;
+use comrak::{
+    arena_tree::Node,
+    nodes::{Ast, NodeValue, NodeWikiLink},
+};
+use miette::{SourceOffset, SourceSpan};
 
-use crate::{file::name::Filename, sed::ReplacePair, visitor::Visitor};
+use crate::{
+    file::name::Filename,
+    sed::ReplacePair,
+    visitor::{VisitError, Visitor},
+};
 
 /// A linkable string, like that in a wikilink, or its corresponding filename
 /// Aliases are always lowercase
@@ -67,32 +73,23 @@ impl WikilinkVisitor {
 
 impl Visitor for WikilinkVisitor {
     fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
-        if let NodeValue::FrontMatter(text) = &node.data.borrow().value {
-            let YamlFrontMatter { alias } = serde_yaml::from_str::<YamlFrontMatter>(&text)?;
-            for alias in alias.split(',') {
-                self.aliases.push(Alias::new(alias.trim()));
-            }
-        }
-        Ok(())
-    }
-
-    fn visit(&mut self, node: &Node, source: &str) {
-        let node_kind = node.kind();
-        if Self::NODE_KINDS.contains(&node_kind) {
-            let tag_text = node
-                .utf8_text(source.as_bytes())
-                .expect("The text must exist... right?"); // TODO: Investigate
-            let span = SourceSpan::new(
-                node.start_byte().into(),
-                node.end_byte() - node.start_byte(),
-            );
+        let data = node.data.borrow();
+        if let NodeValue::WikiLink(NodeWikiLink { url }) = &data.value {
             self.wikilinks.push(
                 Wikilink::builder()
-                    .alias(Alias::new(tag_text))
-                    .span(span)
+                    .alias(Alias::new(url))
+                    .span(SourceSpan::new(
+                        SourceOffset::from_location(
+                            source,
+                            data.sourcepos.start.line,
+                            data.sourcepos.start.column,
+                        ),
+                        data.sourcepos.end.column - data.sourcepos.start.column,
+                    ))
                     .build(),
             );
         }
+        Ok(())
     }
     fn finalize_file(
         &mut self,
