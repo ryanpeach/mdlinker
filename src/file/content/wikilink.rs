@@ -52,7 +52,7 @@ pub struct WikilinkVisitor {
 }
 
 impl WikilinkVisitor {
-    pub const NODE_KIND: &'static str = "wikilink";
+    pub const NODE_KINDS: &'static [&'static str] = &["wiki_link", "tag"];
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -63,9 +63,11 @@ impl WikilinkVisitor {
 
 impl Visitor for WikilinkVisitor {
     fn visit(&mut self, node: &Node, source: &str) {
-        let node_type = node.kind();
-        if node_type == Self::NODE_KIND {
-            let tag_text = node.utf8_text(source.as_bytes()).unwrap();
+        let node_kind = node.kind();
+        if Self::NODE_KINDS.contains(&node_kind) {
+            let tag_text = node
+                .utf8_text(source.as_bytes())
+                .expect("The text must exist... right?"); // TODO: Investigate
             let span = SourceSpan::new(
                 node.start_byte().into(),
                 node.end_byte() - node.start_byte(),
@@ -81,14 +83,14 @@ impl Visitor for WikilinkVisitor {
     fn finalize_file(
         &mut self,
         _source: &str,
-        _path: &std::path::PathBuf,
+        _path: &std::path::Path,
     ) -> Result<(), crate::visitor::FinalizeError> {
         self.wikilinks.clear();
         Ok(())
     }
     fn finalize(
         &mut self,
-        _exclude: &Vec<crate::rules::ErrorCode>,
+        _exclude: &[crate::rules::ErrorCode],
     ) -> Result<(), crate::visitor::FinalizeError> {
         self.wikilinks.clear();
         Ok(())

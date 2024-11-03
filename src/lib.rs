@@ -15,7 +15,6 @@ use rules::{
     duplicate_alias::DuplicateAlias,
     similar_filename::SimilarFilename,
 };
-use tree_sitter::Parser;
 use visitor::{parse, Visitor};
 
 use crate::rules::VecHasIdExtensions;
@@ -48,11 +47,6 @@ impl OutputReport {
 /// Basically if this library fails, this returns an Err
 /// but if this library runs, even if it finds linting violations, this returns an Ok
 pub fn lib(config: &config::Config) -> Result<OutputReport> {
-    // Load the grammar (this assumes you've linked the grammar properly)
-    let language = tree_sitter_markdown::language();
-    let mut parser = Parser::new();
-    parser.set_language(language).map_err(|e| miette!(e))?;
-
     // Compile our regex patterns
     let boundary_regex = regex::Regex::new(&config.boundary_pattern).map_err(|e| miette!(e))?;
     let filename_spacing_regex =
@@ -82,13 +76,15 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
     )));
     for file in all_files {
         let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![broken_wikilinks_visitor.clone()];
-        parse(&mut parser, &file, visitors);
+        parse(&file, visitors).map_err(|e| miette!(e))?;
     }
     let mut broken_wikilinks_visitor: BrokenWikilinkVisitor =
         Rc::try_unwrap(broken_wikilinks_visitor)
             .expect("visitors vector went out of scope")
             .into_inner();
-    broken_wikilinks_visitor.finalize(&config.exclude);
+    broken_wikilinks_visitor
+        .finalize(&config.exclude)
+        .map_err(|e| miette!(e))?;
 
     Ok(OutputReport::builder()
         .similar_filenames(similar_filenames)
