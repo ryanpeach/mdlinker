@@ -1,1 +1,3 @@
-alias:: dolor
+---
+alias: dolor
+---

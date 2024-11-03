@@ -1,1 +1,3 @@
-alias:: lorem, dolor
+---
+alias: lorem, dolor
+---
