@@ -9,7 +9,10 @@ use hashbrown::HashMap;
 use indicatif::ProgressBar;
 use miette::{Diagnostic, SourceOffset, SourceSpan};
 use regex::Regex;
-use std::path::{Path, PathBuf};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 
 use super::ErrorCode;
@@ -142,9 +145,13 @@ impl SimilarFilename {
         // TODO: Unfortunately this is O(n^2)
         #[allow(clippy::cast_precision_loss)]
         let n = file_ngrams.len() as f64;
-        #[allow(clippy::cast_sign_loss)]
-        #[allow(clippy::cast_possible_truncation)]
-        let file_crosscheck_bar = ProgressBar::new((n * (n + 1.0) / 2.0) as u64);
+        let file_crosscheck_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
+            None
+        } else {
+            #[allow(clippy::cast_sign_loss)]
+            #[allow(clippy::cast_possible_truncation)]
+            Some(ProgressBar::new((n * (n + 1.0) / 2.0) as u64))
+        };
         let matcher = SkimMatcherV2::default();
         let mut matches: Vec<SimilarFilename> = Vec::new();
         for (i, (ngram, filepath)) in file_ngrams.clone().iter().enumerate() {
@@ -154,7 +161,9 @@ impl SimilarFilename {
                     continue;
                 }
 
-                file_crosscheck_bar.inc(1);
+                if let Some(bar) = &file_crosscheck_bar {
+                    bar.inc(1);
+                }
 
                 // Skip if the same file
                 if filepath == other_filepath {
@@ -192,7 +201,9 @@ impl SimilarFilename {
                 }
             }
         }
-        file_crosscheck_bar.finish();
+        if let Some(bar) = file_crosscheck_bar {
+            bar.finish();
+        }
         Ok(matches)
     }
 }

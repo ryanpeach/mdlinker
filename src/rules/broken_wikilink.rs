@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bon::Builder;
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
@@ -75,20 +75,21 @@ impl BrokenWikilinkVisitor {
 
 impl Visitor for BrokenWikilinkVisitor {
     fn visit(&mut self, node: &Node, source: &str) {
-        match node.kind() {
-            DuplicateAliasVisitor::NODE_KIND => self.duplicate_alias_visitor.visit(node, source),
-            WikilinkVisitor::NODE_KIND => self.wikilinks_visitor.visit(node, source),
-            _ => {}
+        if node.kind() == DuplicateAliasVisitor::NODE_KIND {
+            self.duplicate_alias_visitor.visit(node, source);
+        }
+        if WikilinkVisitor::NODE_KINDS.contains(&node.kind()) {
+            self.wikilinks_visitor.visit(node, source);
         }
     }
     fn finalize_file(
         &mut self,
         source: &str,
-        path: &PathBuf,
+        path: &Path,
     ) -> std::result::Result<(), FinalizeError> {
         self.duplicate_alias_visitor.finalize_file(source, path)?;
         let lookup_table = &self.duplicate_alias_visitor.alias_table;
-        let filename = get_filename(path.as_path()).lowercase();
+        let filename = get_filename(path).lowercase();
         let wikilinks = self.wikilinks_visitor.wikilinks.clone();
         for wikilink in wikilinks {
             let alias = wikilink.alias;
@@ -110,7 +111,7 @@ impl Visitor for BrokenWikilinkVisitor {
         Ok(())
     }
 
-    fn finalize(&mut self, excludes: &Vec<ErrorCode>) -> Result<(), FinalizeError> {
+    fn finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
         // We can "take" this because we are putting it right back
         self.broken_wikilinks = dedupe_by_code(filter_by_excludes(
             std::mem::take(&mut self.broken_wikilinks),

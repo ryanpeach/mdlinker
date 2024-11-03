@@ -1,6 +1,6 @@
 use hashbrown::{HashMap, HashSet};
 use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tree_sitter::Node;
 
@@ -126,14 +126,14 @@ impl Visitor for DuplicateAliasVisitor {
             self.front_matter_visitor.visit(node, source);
         }
     }
-    fn finalize_file(&mut self, source: &str, path: &PathBuf) -> Result<(), FinalizeError> {
+    fn finalize_file(&mut self, source: &str, path: &Path) -> Result<(), FinalizeError> {
         // We can "take" the aliases from the front_matter_visitor since we are going to clear them
         let aliases = std::mem::take(&mut self.front_matter_visitor.aliases);
         for alias in aliases {
             // This inserts the alias into the table and returns the previous value if it existed
             // If it did exist, we have a duplicate
             // If it did not exist, we have a new alias in our table
-            if let Some(out) = self.alias_table.insert(alias.clone(), path.clone()) {
+            if let Some(out) = self.alias_table.insert(alias.clone(), path.into()) {
                 self.duplicate_aliases.insert(alias.clone());
                 self.duplicate_alias_errors.push(DuplicateAlias::new(
                     &alias,
@@ -146,10 +146,10 @@ impl Visitor for DuplicateAliasVisitor {
         }
 
         // Call finalize_file on the other visitors
-        self.front_matter_visitor.finalize_file(source, path);
+        self.front_matter_visitor.finalize_file(source, path)?;
         Ok(())
     }
-    fn finalize(&mut self, excludes: &Vec<ErrorCode>) -> Result<(), FinalizeError> {
+    fn finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
         // We can "take" the duplicate from the front_matter_visitor since we are going to put them
         // right back in after some cleaning
         self.duplicate_alias_errors = dedupe_by_code(filter_by_excludes(
@@ -194,15 +194,15 @@ impl DuplicateAlias {
     ///
     pub fn new(
         alias: &Alias,
-        file1_path: &PathBuf,
+        file1_path: &Path,
         file1_content: &str,
-        file2_path: &PathBuf,
+        file2_path: &Path,
         filename_to_alias: &ReplacePair<Filename, Alias>,
     ) -> Result<Self, NewDuplicateAliasError> {
         // Boundary conditions
         if file1_path == file2_path {
             return Err(NewDuplicateAliasError::AliasAndFilenameSame {
-                filename: get_filename(file1_path.as_path()),
+                filename: get_filename(file1_path),
                 alias: alias.clone(),
             });
         }
@@ -216,7 +216,7 @@ impl DuplicateAlias {
             // Find the alias
             let file2_content_found = file2_content.find(&alias.to_string()).ok_or_else(|| {
                 MissingSubstringError::builder()
-                    .path(file2_path.clone())
+                    .path(file2_path.to_path_buf())
                     .ngram(alias.to_string())
                     .build()
             })?;
@@ -248,7 +248,7 @@ impl DuplicateAlias {
                 .find(&alias.to_string())
                 .ok_or_else(|| {
                     MissingSubstringError::builder()
-                        .path(file1_path.clone())
+                        .path(file1_path.to_path_buf())
                         .ngram(alias.to_string())
                         .build()
                 })?;
@@ -257,7 +257,7 @@ impl DuplicateAlias {
                 .find(&alias.to_string())
                 .ok_or_else(|| {
                     MissingSubstringError::builder()
-                        .path(file2_path.clone())
+                        .path(file2_path.to_path_buf())
                         .ngram(alias.to_string())
                         .build()
                 })?;

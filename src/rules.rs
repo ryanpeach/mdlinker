@@ -31,10 +31,10 @@ where
     T: HasId + PartialOrd,
 {
     #[must_use]
-    fn finalize(self, excludes: &Vec<ErrorCode>) -> Self;
+    fn finalize(self, excludes: &[ErrorCode]) -> Self;
 }
 
-fn filter_by_excludes<T: HasId>(mut this: Vec<T>, excludes: &Vec<ErrorCode>) -> Vec<T> {
+fn filter_by_excludes<T: HasId>(mut this: Vec<T>, excludes: &[ErrorCode]) -> Vec<T> {
     this.retain(|item| {
         !excludes.iter().any(|exclude| {
             item.id()
@@ -57,7 +57,7 @@ fn dedupe_by_code<T: HasId + PartialOrd>(mut this: Vec<T>) -> Vec<T> {
 /// Used for filtering out items that start with the exclude code
 impl<T: HasId + PartialOrd> VecHasIdExtensions<T> for Vec<T> {
     #[must_use]
-    fn finalize(self, excludes: &Vec<ErrorCode>) -> Self {
+    fn finalize(self, excludes: &[ErrorCode]) -> Self {
         dedupe_by_code(filter_by_excludes(self, excludes))
     }
 }

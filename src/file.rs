@@ -8,7 +8,6 @@ use std;
 
 pub mod content;
 pub mod name;
-mod treesitter;
 
 /// Walk the directories and get just the files
 pub fn get_files(dirs: &Vec<PathBuf>) -> Vec<PathBuf> {
