@@ -3,18 +3,18 @@ use std::{
     fmt::{Display, Formatter},
 };
 
+use crate::{
+    file::name::Filename,
+    sed::ReplacePair,
+    visitor::{VisitError, Visitor},
+};
 use bon::Builder;
 use comrak::{
     arena_tree::Node,
     nodes::{Ast, NodeValue, NodeWikiLink},
 };
 use miette::{SourceOffset, SourceSpan};
-
-use crate::{
-    file::name::Filename,
-    sed::ReplacePair,
-    visitor::{VisitError, Visitor},
-};
+use regex::Regex;
 
 /// A linkable string, like that in a wikilink, or its corresponding filename
 /// Aliases are always lowercase
@@ -56,38 +56,79 @@ pub struct Wikilink {
     pub span: SourceSpan,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct WikilinkVisitor {
     pub wikilinks: Vec<Wikilink>,
+    tag_pattern: Regex,
+}
+
+impl Default for WikilinkVisitor {
+    fn default() -> Self {
+        Self {
+            wikilinks: Vec::new(),
+            tag_pattern: Regex::new(r"#([A-Za-z0-9_/-]+)").expect("Constant"),
+        }
+    }
 }
 
 impl WikilinkVisitor {
-    pub const NODE_KINDS: &'static [&'static str] = &["wiki_link", "tag"];
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            wikilinks: Vec::new(),
-        }
+        Self::default()
     }
 }
 
 impl Visitor for WikilinkVisitor {
     fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
-        let data = node.data.borrow();
-        if let NodeValue::WikiLink(NodeWikiLink { url }) = &data.value {
-            self.wikilinks.push(
-                Wikilink::builder()
-                    .alias(Alias::new(url))
-                    .span(SourceSpan::new(
-                        SourceOffset::from_location(
-                            source,
-                            data.sourcepos.start.line,
-                            data.sourcepos.start.column,
-                        ),
-                        data.sourcepos.end.column - data.sourcepos.start.column,
-                    ))
-                    .build(),
-            );
+        let data_ref = node.data.borrow();
+        let data = &data_ref.value;
+        let sourcepos = data_ref.sourcepos;
+        let mut get_tags = |text: &str| {
+            for captures in self.tag_pattern.captures_iter(text) {
+                self.wikilinks.push(
+                    Wikilink::builder()
+                        .alias(Alias::new(
+                            captures
+                                .get(1)
+                                .expect("Otherwise the regex wouldn't match")
+                                .as_str(),
+                        ))
+                        .span(SourceSpan::new(
+                            SourceOffset::from_location(
+                                source,
+                                sourcepos.start.line,
+                                sourcepos.start.column,
+                            ),
+                            sourcepos.end.column - sourcepos.start.column,
+                        ))
+                        .build(),
+                );
+            }
+        };
+        match data {
+            NodeValue::Text(text) => {
+                get_tags(text);
+            }
+            NodeValue::WikiLink(NodeWikiLink { url }) => {
+                self.wikilinks.push(
+                    Wikilink::builder()
+                        .alias(Alias::new(url))
+                        .span(SourceSpan::new(
+                            SourceOffset::from_location(
+                                source,
+                                sourcepos.start.line,
+                                sourcepos.start.column,
+                            ),
+                            sourcepos.end.column - sourcepos.start.column,
+                        ))
+                        .build(),
+                );
+            }
+            x => {
+                if let Some(text) = x.text() {
+                    get_tags(text);
+                }
+            }
         }
         Ok(())
     }

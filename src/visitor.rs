@@ -8,6 +8,7 @@ use std::{
 use comrak::{
     arena_tree::Node, nodes::Ast, parse_document, Arena, ExtensionOptionsBuilder, Options,
 };
+use log::debug;
 use thiserror::Error;
 
 use crate::rules::{duplicate_alias::NewDuplicateAliasError, ErrorCode};
@@ -81,6 +82,7 @@ pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<
 
     // Pass the node to all the visitors
     for node in root.descendants() {
+        debug!("{:?}", node);
         for visitor in visitors.clone() {
             let mut visitor_cell = (*visitor).borrow_mut();
             visitor_cell.visit(node, &source)?;
