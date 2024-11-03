@@ -12,13 +12,15 @@ use std::{cell::RefCell, rc::Rc};
 use bon::Builder;
 use file::{get_files, name::ngrams};
 use miette::{miette, Result};
+use ngrams::MissingSubstringError;
 use rules::{
     broken_wikilink::{BrokenWikilink, BrokenWikilinkVisitor},
     duplicate_alias::{DuplicateAlias, DuplicateAliasVisitor},
     similar_filename::SimilarFilename,
     unlinked_text::UnlinkedText,
 };
-use visitor::{parse, Visitor};
+use thiserror::Error;
+use visitor::{parse, FinalizeError, ParseError, Visitor};
 
 use crate::rules::VecHasIdExtensions;
 
@@ -40,6 +42,18 @@ impl OutputReport {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum OutputErrors {
+    #[error(transparent)]
+    RegexError(#[from] regex::Error),
+    #[error(transparent)]
+    MissingSubstringError(#[from] MissingSubstringError),
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
+    #[error(transparent)]
+    FinalizeError(#[from] FinalizeError),
+}
+
 /// The main library function that takes a configuration and returns a Result
 /// Comparable to running as an executable
 ///
@@ -50,11 +64,10 @@ impl OutputReport {
 ///
 /// Basically if this library fails, this returns an Err
 /// but if this library runs, even if it finds linting violations, this returns an Ok
-pub fn lib(config: &config::Config) -> Result<OutputReport> {
+pub fn lib(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     // Compile our regex patterns
-    let boundary_regex = regex::Regex::new(&config.boundary_pattern).map_err(|e| miette!(e))?;
-    let filename_spacing_regex =
-        regex::Regex::new(&config.filename_spacing_pattern).map_err(|e| miette!(e))?;
+    let boundary_regex = regex::Regex::new(&config.boundary_pattern)?;
+    let filename_spacing_regex = regex::Regex::new(&config.filename_spacing_pattern)?;
 
     let all_files = get_files(&config.directories);
     let file_ngrams = ngrams(
@@ -70,8 +83,7 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
         &file_ngrams,
         config.filename_match_threshold,
         &filename_spacing_regex,
-    )
-    .map_err(|e| miette!("From SimilarFilename: {e}"))?
+    )?
     .finalize(&config.exclude);
 
     //  The duplicate alias visitor has to run first to get the table of aliases
@@ -81,15 +93,13 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
     )));
     for file in &all_files {
         let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![duplicate_alias_visitor.clone()];
-        parse(file, visitors).map_err(|e| miette!(e))?;
+        parse(file, visitors)?;
     }
     let mut duplicate_alias_visitor: DuplicateAliasVisitor =
         Rc::try_unwrap(duplicate_alias_visitor)
             .expect("visitors vector went out of scope")
             .into_inner();
-    duplicate_alias_visitor
-        .finalize(&config.exclude)
-        .map_err(|e| miette!(e))?;
+    duplicate_alias_visitor.finalize(&config.exclude)?;
 
     // The broken wikilinks visitor
     let broken_wikilinks_visitor = Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
@@ -109,7 +119,7 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
             broken_wikilinks_visitor.clone(),
             unlinked_text_visitor.clone(),
         ];
-        parse(file, visitors).map_err(|e| miette!(e))?;
+        parse(file, visitors)?;
     }
     let mut broken_wikilinks_visitor: BrokenWikilinkVisitor =
         Rc::try_unwrap(broken_wikilinks_visitor)
@@ -119,12 +129,8 @@ pub fn lib(config: &config::Config) -> Result<OutputReport> {
         Rc::try_unwrap(unlinked_text_visitor)
             .expect("visitors vector went out of scope")
             .into_inner();
-    broken_wikilinks_visitor
-        .finalize(&config.exclude)
-        .map_err(|e| miette!(e))?;
-    unlinked_text_visitor
-        .finalize(&config.exclude)
-        .map_err(|e| miette!(e))?;
+    broken_wikilinks_visitor.finalize(&config.exclude)?;
+    unlinked_text_visitor.finalize(&config.exclude)?;
 
     Ok(OutputReport::builder()
         .similar_filenames(similar_filenames)
