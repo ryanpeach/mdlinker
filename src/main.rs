@@ -11,7 +11,10 @@ fn main() -> Result<()> {
 
     let mut nb_errors = 0;
     match lib(&config) {
-        Err(e) => Err(e)?,
+        Err(e) => {
+            eprintln!("{:?}", miette!(e));
+            return Err(miette!("Something went wrong during linting"));
+        }
         Ok(e) => {
             println!();
             for error in e.similar_filenames {

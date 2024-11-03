@@ -1,11 +1,12 @@
 use std::{
+    any::Any,
     cell::RefCell,
     path::{Path, PathBuf},
 };
 
 use crate::{
     file::{
-        content::wikilink::Alias,
+        content::wikilink::{Alias, WikilinkVisitor},
         name::{get_filename, Filename},
     },
     sed::ReplacePair,
@@ -65,6 +66,7 @@ impl HasId for UnlinkedText {
 pub struct UnlinkedTextVisitor {
     pub alias_table: HashMap<Alias, PathBuf>,
     new_unlinked_texts: Vec<(Alias, SourceSpan)>,
+    wikilink_visitor: WikilinkVisitor,
     pub unlinked_texts: Vec<UnlinkedText>,
 }
 
@@ -77,41 +79,84 @@ impl UnlinkedTextVisitor {
     ) -> Self {
         Self {
             alias_table,
+            wikilink_visitor: WikilinkVisitor::new(),
             unlinked_texts: Vec::new(),
             new_unlinked_texts: Vec::new(),
         }
     }
 }
 
+/// Checks if `span` is inside or equal to `other`
+fn span_inside(span: SourceSpan, other: SourceSpan) -> bool {
+    let span_end = span.offset() + span.len();
+    let other_end = other.offset() + other.len();
+    span.offset() >= other.offset() && span_end <= other_end
+}
+
 impl Visitor for UnlinkedTextVisitor {
     fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
+        self.wikilink_visitor.visit(node, source)?;
         let data_ref = node.data.borrow();
         let data = &data_ref.value;
         let sourcepos = data_ref.sourcepos;
-        let mut get_tags = |text: &str| {
-            let lowercase_source = text.to_lowercase();
+        let parent = node.parent();
+        let mut get_new_unlinked_texts = |text: &str| {
+            let lowercase_text = text.to_lowercase();
             for alias in self.alias_table.keys() {
-                if let Some(found) = lowercase_source.find(&alias.to_string()) {
-                    self.new_unlinked_texts.push((
-                        alias.clone(),
-                        SourceSpan::new(
-                            (SourceOffset::from_location(
-                                source,
-                                sourcepos.start.line,
-                                sourcepos.start.column,
-                            )
-                            .offset()
-                                + found)
-                                .into(),
-                            alias.to_string().len(),
-                        ),
-                    ));
+                if let Some(found) = lowercase_text.find(&alias.to_string()) {
+                    // Make sure neither the character before or after is a letter
+                    // This makes sure you aren't matching a part of a word
+                    if found > 0 && text.chars().nth(found - 1).unwrap().is_alphabetic() {
+                        continue;
+                    }
+                    if found + alias.to_string().len() < text.len()
+                        && text
+                            .chars()
+                            .nth(found + alias.to_string().len())
+                            .unwrap()
+                            .is_alphabetic()
+                    {
+                        continue;
+                    }
+
+                    // Get our span
+                    let span = SourceSpan::new(
+                        (SourceOffset::from_location(
+                            source,
+                            sourcepos.start.line,
+                            sourcepos.start.column,
+                        )
+                        .offset()
+                            + found)
+                            .into(),
+                        alias.to_string().len(),
+                    );
+
+                    // Dont match inside wikilinks
+                    if let Some(parent) = parent {
+                        match parent.data.borrow().value {
+                            NodeValue::WikiLink(_) => {
+                                // If this is already in a link, skip it
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    // Debug: TODO: Remove
+                    if source.contains(" overwhelm, sensory overload, overstimulation") {
+                        let parent_data_ref = parent.unwrap().data.borrow();
+                        let parent_data = format!("{:?}", &parent_data_ref.value);
+                        let parent_span = parent_data_ref.sourcepos;
+                        println!("Found alias: {}", alias.to_string());
+                    }
+                    self.new_unlinked_texts.push((alias.clone(), span));
                 }
             }
         };
         match data {
             NodeValue::Text(text) => {
-                get_tags(text);
+                get_new_unlinked_texts(text);
             }
             _ => {}
         }
@@ -130,11 +175,14 @@ impl Visitor for UnlinkedTextVisitor {
                     .src(NamedSource::new(path.to_string_lossy(), source.to_string()))
                     .alias(alias.clone())
                     .span(*span)
-                    .advice(format!("[[{alias}]]"))
+                    .advice(format!(
+                        "Consider wrapping it in a wikilink, like: [[{alias}]]"
+                    ))
                     .build(),
             );
         }
         self.new_unlinked_texts.clear();
+        self.wikilink_visitor.finalize_file(source, path)?;
         Ok(())
     }
 
@@ -144,6 +192,7 @@ impl Visitor for UnlinkedTextVisitor {
             std::mem::take(&mut self.unlinked_texts),
             excludes,
         ));
+        self.wikilink_visitor.finalize(excludes)?;
         Ok(())
     }
 }
