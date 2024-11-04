@@ -16,6 +16,8 @@ use comrak::{
 use miette::{SourceOffset, SourceSpan};
 use regex::Regex;
 
+use super::front_matter::{remove_frontmatter_from_source, repair_span_due_to_frontmatter};
+
 /// A linkable string, like that in a wikilink, or its corresponding filename
 /// Aliases are always lowercase
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -25,6 +27,14 @@ impl Alias {
     #[must_use]
     pub fn new(alias: &str) -> Self {
         Self(alias.to_lowercase())
+    }
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -77,9 +87,8 @@ impl WikilinkVisitor {
         Self::default()
     }
 }
-
 impl Visitor for WikilinkVisitor {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "WikilinkVisitor"
     }
     fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
@@ -88,21 +97,31 @@ impl Visitor for WikilinkVisitor {
         let sourcepos = data_ref.sourcepos;
         let mut get_tags = |text: &str| {
             for captures in self.tag_pattern.captures_iter(text) {
+                let alias = Alias::new(
+                    captures
+                        .get(1)
+                        .expect("Otherwise the regex wouldn't match")
+                        .as_str(),
+                );
                 self.wikilinks.push(
                     Wikilink::builder()
-                        .alias(Alias::new(
-                            captures
-                                .get(1)
-                                .expect("Otherwise the regex wouldn't match")
-                                .as_str(),
-                        ))
-                        .span(SourceSpan::new(
-                            SourceOffset::from_location(
-                                source,
-                                sourcepos.start.line,
-                                sourcepos.start.column,
+                        .alias(alias.clone())
+                        .span(repair_span_due_to_frontmatter(
+                            SourceSpan::new(
+                                (SourceOffset::from_location(
+                                    remove_frontmatter_from_source(source, node),
+                                    sourcepos.start.line,
+                                    sourcepos.start.column,
+                                )
+                                .offset()
+                                    + captures
+                                        .get(1)
+                                        .expect("The regex has 2 capture groups")
+                                        .start())
+                                .into(),
+                                alias.len(),
                             ),
-                            sourcepos.end.column - sourcepos.start.column,
+                            node,
                         ))
                         .build(),
                 );
@@ -116,13 +135,16 @@ impl Visitor for WikilinkVisitor {
                 self.wikilinks.push(
                     Wikilink::builder()
                         .alias(Alias::new(url))
-                        .span(SourceSpan::new(
-                            SourceOffset::from_location(
-                                source,
-                                sourcepos.start.line,
-                                sourcepos.start.column,
+                        .span(repair_span_due_to_frontmatter(
+                            SourceSpan::new(
+                                SourceOffset::from_location(
+                                    remove_frontmatter_from_source(source, node),
+                                    sourcepos.start.line,
+                                    sourcepos.start.column,
+                                ),
+                                url.len(),
                             ),
-                            sourcepos.end.column - sourcepos.start.column,
+                            node,
                         ))
                         .build(),
                 );

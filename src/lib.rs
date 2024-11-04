@@ -11,7 +11,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use bon::Builder;
 use file::{get_files, name::ngrams};
-use miette::{miette, Result};
+use miette::Result;
 use ngrams::MissingSubstringError;
 use rules::{
     broken_wikilink::{BrokenWikilink, BrokenWikilinkVisitor},

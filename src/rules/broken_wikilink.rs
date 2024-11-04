@@ -14,7 +14,6 @@ use crate::{
 use bon::Builder;
 use comrak::{arena_tree::Node, nodes::Ast};
 use hashbrown::HashMap;
-use log::debug;
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
 use thiserror::Error;
 
@@ -33,7 +32,7 @@ pub struct BrokenWikilink {
     src: NamedSource<String>,
 
     #[label("Wikilink")]
-    wikilink: SourceSpan,
+    pub wikilink: SourceSpan,
 
     #[help]
     advice: String,
@@ -78,9 +77,8 @@ impl BrokenWikilinkVisitor {
         }
     }
 }
-
 impl Visitor for BrokenWikilinkVisitor {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "BrokenWikilinkVisitor"
     }
     fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
@@ -103,7 +101,7 @@ impl Visitor for BrokenWikilinkVisitor {
                         .src(NamedSource::new(path.to_string_lossy(), source.to_string()))
                         .wikilink(wikilink.span)
                         .advice(format!(
-                            "Create a page or alias for '{alias}' (case insensitive)"
+                            "Create a page or alias on an existing page for '{alias}' (case insensitive), or fix the wikilinks spelling"
                         ))
                         .build(),
                 );
