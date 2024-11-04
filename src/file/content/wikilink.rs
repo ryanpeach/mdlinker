@@ -142,7 +142,7 @@ impl Visitor for WikilinkVisitor {
                                     sourcepos.start.line,
                                     sourcepos.start.column,
                                 ),
-                                url.len(),
+                                url.len() + 4,
                             ),
                             node,
                         ))
