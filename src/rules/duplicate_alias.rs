@@ -110,6 +110,9 @@ impl DuplicateAliasVisitor {
         for file in all_files {
             let filename = get_filename(file.as_path());
             let alias = Alias::from_filename(&filename, filename_to_alias);
+            if alias.is_empty() {
+                continue;
+            }
             alias_table.insert(alias, file.clone());
         }
         Self {
@@ -121,9 +124,8 @@ impl DuplicateAliasVisitor {
         }
     }
 }
-
 impl Visitor for DuplicateAliasVisitor {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "DuplicateAliasVisitor"
     }
     fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {

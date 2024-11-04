@@ -1,11 +1,12 @@
-use std::{path::PathBuf, str::FromStr};
-
+use log::info;
 use mdlinker::{config, lib};
+use std::{path::PathBuf, str::FromStr};
 
 /// [`foo.md`](./assets/logseq/pages/foo.md) and [`foo___bar.md`](./assets/logseq/pages/foo___bar.md) should not conflict
 /// because the word `foo` in `foo/bar` is just a properly used group name.
 #[test]
 fn groups_first_element_same() {
+    info!("groups_first_element_same");
     let config = config::Config::builder()
         .directories(vec![PathBuf::from_str(
             "./tests/logseq/similar_filename/assets/pages",

@@ -32,34 +32,42 @@ pub enum FinalizeError {
 
 /// A trait for implementing an AST visitor pattern
 pub trait Visitor {
-    /// NOTE: Call this one
-    /// WARNING: Don't implment this, its already written for you.
+    /// The function that is called when visiting a node
+    /// WARNING: Don't overwrite this, its already written for you.
     /// Implement [`Self::_visit`] instead
     fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
-        trace!("{:?} visiting node type: {:?}", self.name(), node.data.borrow().value);
+        trace!(
+            "{:?} visiting node type: {:?}",
+            self.name(),
+            node.data.borrow().value
+        );
+        #[allow(clippy::used_underscore_items)]
         self._visit(node, source)
     }
 
+    /// Optional function that runs after every file
+    /// WARNING: Don't overwrite this, its already written for you.
+    /// Implement [`Self::_finalize_file`] instead
     fn finalize_file(&mut self, source: &str, path: &Path) -> Result<(), FinalizeError> {
         trace!("{:?} finalizing file {:?}", self.name(), path);
+        #[allow(clippy::used_underscore_items)]
         self._finalize_file(source, path)
     }
 
+    /// Optional function for doing something after visiting all nodes
+    /// You have to run this yourself in lib, its not done in any of the funtions in this file for you
+    /// WARNING: Don't overwrite this, its already written for you.
+    /// Implement [`Self::_finalize`] instead
     fn finalize(&mut self, exclude: &[ErrorCode]) -> Result<(), FinalizeError> {
         trace!("{:?} finalizing", self.name());
+        #[allow(clippy::used_underscore_items)]
         self._finalize(exclude)
     }
 
-    /// NOTE: Implement this one
-    /// WARNING: Don't call this one, its already called for you.
-    /// Call [`Self::visit`] instead
     fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError>;
 
-    /// Optional function that runs after every file
     fn _finalize_file(&mut self, _source: &str, _path: &Path) -> Result<(), FinalizeError>;
 
-    /// Optional function for doing something after visiting all nodes
-    /// You have to run this yourself in lib, its not done in any of the funtions in this file for you
     fn _finalize(&mut self, _exclude: &[ErrorCode]) -> Result<(), FinalizeError>;
 
     /// Get a unique name for the visitor

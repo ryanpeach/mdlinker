@@ -1,12 +1,14 @@
 use std::{
-    any::Any,
     cell::RefCell,
     path::{Path, PathBuf},
 };
 
 use crate::{
     file::{
-        content::wikilink::{Alias, WikilinkVisitor},
+        content::{
+            front_matter::{remove_frontmatter_from_source, repair_span_due_to_frontmatter},
+            wikilink::{Alias, WikilinkVisitor},
+        },
         name::{get_filename, Filename},
     },
     sed::ReplacePair,
@@ -85,9 +87,8 @@ impl UnlinkedTextVisitor {
         }
     }
 }
-
 impl Visitor for UnlinkedTextVisitor {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "UnlinkedTextVisitor"
     }
     fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
@@ -96,60 +97,59 @@ impl Visitor for UnlinkedTextVisitor {
         let data = &data_ref.value;
         let sourcepos = data_ref.sourcepos;
         let parent = node.parent();
-        let mut get_new_unlinked_texts = |text: &str| {
+        if let NodeValue::Text(text) = data {
             let lowercase_text = text.to_lowercase();
             for alias in self.alias_table.keys() {
-                debug_assert!(!alias.to_string().is_empty(), "How did an empty string get in the alias table");
                 if let Some(found) = lowercase_text.find(&alias.to_string()) {
                     // Make sure neither the character before or after is a letter
                     // This makes sure you aren't matching a part of a word
                     // This should also handle tags
-                    if found > 0 && !text.chars().nth(found - 1).unwrap().is_whitespace() {
+                    if found > 0
+                        && !text
+                            .chars()
+                            .nth(found - 1)
+                            .expect("found is greater than 0")
+                            .is_whitespace()
+                    {
                         continue;
                     }
                     if found + alias.to_string().len() < text.len()
                         && text
                             .chars()
                             .nth(found + alias.to_string().len())
-                            .unwrap()
+                            .expect("Already checked that found + alias.len() < text.len()")
                             .is_alphabetic()
                     {
                         continue;
                     }
 
                     // Get our span
-                    let span = SourceSpan::new(
-                        (SourceOffset::from_location(
-                            source,
-                            sourcepos.start.line,
-                            sourcepos.start.column,
-                        )
-                        .offset()
-                            + found)
-                            .into(),
-                        alias.to_string().len(),
+                    let span = repair_span_due_to_frontmatter(
+                        SourceSpan::new(
+                            (SourceOffset::from_location(
+                                remove_frontmatter_from_source(source, node),
+                                sourcepos.start.line,
+                                sourcepos.start.column,
+                            )
+                            .offset()
+                                + found)
+                                .into(),
+                            alias.to_string().len(),
+                        ),
+                        node,
                     );
 
                     // Dont match inside wikilinks
                     if let Some(parent) = parent {
-                        match parent.data.borrow().value {
-                            NodeValue::WikiLink(_) => {
-                                // If this is already in a link, skip it
-                                continue;
-                            }
-                            _ => {}
+                        if let NodeValue::WikiLink(_) = parent.data.borrow().value {
+                            // If this is already in a link, skip it
+                            continue;
                         }
                     }
 
                     self.new_unlinked_texts.push((alias.clone(), span));
                 }
             }
-        };
-        match data {
-            NodeValue::Text(text) => {
-                get_new_unlinked_texts(text);
-            }
-            _ => {}
         }
         Ok(())
     }
