@@ -80,11 +80,14 @@ impl BrokenWikilinkVisitor {
 }
 
 impl Visitor for BrokenWikilinkVisitor {
-    fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
+    fn name(&self) -> &str {
+        "BrokenWikilinkVisitor"
+    }
+    fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
         self.wikilinks_visitor.visit(node, source)?;
         Ok(())
     }
-    fn finalize_file(
+    fn _finalize_file(
         &mut self,
         source: &str,
         path: &Path,
@@ -94,7 +97,6 @@ impl Visitor for BrokenWikilinkVisitor {
         for wikilink in wikilinks {
             let alias = wikilink.alias;
             if !self.alias_table.contains_key(&alias) {
-                debug!("Broken wikilink: {}", alias);
                 self.broken_wikilinks.push(
                     BrokenWikilink::builder()
                         .id(format!("{CODE}::{filename}::{alias}").into())
@@ -112,7 +114,7 @@ impl Visitor for BrokenWikilinkVisitor {
         Ok(())
     }
 
-    fn finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
+    fn _finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
         // We can "take" this because we are putting it right back
         self.broken_wikilinks = dedupe_by_code(filter_by_excludes(
             std::mem::take(&mut self.broken_wikilinks),

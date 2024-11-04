@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use mdlinker::rules::broken_wikilink;
 
 use mdlinker::rules::filter_code;
-
+use log::debug;
 use crate::common::get_report;
 
 lazy_static! {
@@ -16,7 +16,7 @@ lazy_static! {
 fn number_of_broken_wikilinks() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
-        println!("{broken_wikilink:?}");
+        debug!("{broken_wikilink:?}");
     }
     assert_eq!(report.broken_wikilinks.len(), 4);
 }
@@ -26,7 +26,7 @@ fn number_of_broken_wikilinks() {
 fn lorem_exist_and_is_wikilink() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
-        println!("{broken_wikilink:?}");
+        debug!("{broken_wikilink:?}");
     }
     assert!(filter_code(
         report.broken_wikilinks,
@@ -40,7 +40,7 @@ fn lorem_exist_and_is_wikilink() {
 fn ipsum_does_not_exist_and_is_wikilink() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
-        println!("{broken_wikilink:?}");
+        debug!("{broken_wikilink:?}");
     }
     assert!(!filter_code(
         report.broken_wikilinks,
@@ -54,7 +54,7 @@ fn ipsum_does_not_exist_and_is_wikilink() {
 fn dolor_does_not_exist_and_is_not_wikilink() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
-        println!("{broken_wikilink:?}");
+        debug!("{broken_wikilink:#?}");
     }
     assert!(filter_code(
         report.broken_wikilinks,
@@ -69,7 +69,7 @@ fn dolor_does_not_exist_and_is_not_wikilink() {
 fn sit_exists_and_is_tag() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
-        println!("{broken_wikilink:?}");
+        debug!("{broken_wikilink:#?}");
     }
     assert!(filter_code(
         report.broken_wikilinks,
@@ -84,7 +84,7 @@ fn sit_exists_and_is_tag() {
 fn amet_does_not_exist_and_is_fancy_tag() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
-        println!("{broken_wikilink:?}");
+        debug!("{broken_wikilink:#?}");
     }
     assert!(!filter_code(
         report.broken_wikilinks,
@@ -99,7 +99,7 @@ fn amet_does_not_exist_and_is_fancy_tag() {
 fn consectetur_does_not_exist_and_is_tag() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
-        println!("{broken_wikilink:?}");
+        debug!("{broken_wikilink:#?}");
     }
     assert!(!filter_code(
         report.broken_wikilinks,
@@ -114,7 +114,7 @@ fn consectetur_does_not_exist_and_is_tag() {
 fn adipiscing_does_not_exist_and_is_tag() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
-        println!("{broken_wikilink:?}");
+        debug!("{broken_wikilink:#?}");
     }
     assert!(!filter_code(
         report.broken_wikilinks,
@@ -129,7 +129,7 @@ fn adipiscing_does_not_exist_and_is_tag() {
 fn elit_exists_and_is_tag() {
     let report = get_report(PATHS.as_slice());
     for broken_wikilink in &report.broken_wikilinks {
-        println!("{broken_wikilink:?}");
+        debug!("{broken_wikilink:#?}");
     }
     assert!(filter_code(
         report.broken_wikilinks,

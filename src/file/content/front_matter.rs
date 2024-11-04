@@ -33,7 +33,10 @@ impl FrontMatterVisitor {
 }
 
 impl Visitor for FrontMatterVisitor {
-    fn visit(&mut self, node: &Node<RefCell<Ast>>, _source: &str) -> Result<(), VisitError> {
+    fn name(&self) -> &str {
+        "FrontMatterVisitor"
+    }
+    fn _visit(&mut self, node: &Node<RefCell<Ast>>, _source: &str) -> Result<(), VisitError> {
         if let NodeValue::FrontMatter(text) = &node.data.borrow().value {
             // Strip off first and last line for --- delimeters
             let lines: Vec<&str> = text.trim().lines().collect();
@@ -52,7 +55,7 @@ impl Visitor for FrontMatterVisitor {
         }
         Ok(())
     }
-    fn finalize_file(
+    fn _finalize_file(
         &mut self,
         _source: &str,
         _path: &Path,
@@ -60,7 +63,7 @@ impl Visitor for FrontMatterVisitor {
         self.aliases.clear();
         Ok(())
     }
-    fn finalize(&mut self, _exclude: &[ErrorCode]) -> Result<(), crate::visitor::FinalizeError> {
+    fn _finalize(&mut self, _exclude: &[ErrorCode]) -> Result<(), crate::visitor::FinalizeError> {
         self.aliases.clear();
         Ok(())
     }

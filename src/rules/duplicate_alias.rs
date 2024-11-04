@@ -123,11 +123,14 @@ impl DuplicateAliasVisitor {
 }
 
 impl Visitor for DuplicateAliasVisitor {
-    fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
+    fn name(&self) -> &str {
+        "DuplicateAliasVisitor"
+    }
+    fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
         self.front_matter_visitor.visit(node, source)?;
         Ok(())
     }
-    fn finalize_file(&mut self, source: &str, path: &Path) -> Result<(), FinalizeError> {
+    fn _finalize_file(&mut self, source: &str, path: &Path) -> Result<(), FinalizeError> {
         // We can "take" the aliases from the front_matter_visitor since we are going to clear them
         let aliases = std::mem::take(&mut self.front_matter_visitor.aliases);
         for alias in aliases {
@@ -151,7 +154,7 @@ impl Visitor for DuplicateAliasVisitor {
         self.front_matter_visitor.finalize_file(source, path)?;
         Ok(())
     }
-    fn finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
+    fn _finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
         // We can "take" the duplicate from the front_matter_visitor since we are going to put them
         // right back in after some cleaning
         self.duplicate_alias_errors = dedupe_by_code(filter_by_excludes(

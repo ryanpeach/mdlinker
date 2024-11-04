@@ -79,7 +79,10 @@ impl WikilinkVisitor {
 }
 
 impl Visitor for WikilinkVisitor {
-    fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
+    fn name(&self) -> &str {
+        "WikilinkVisitor"
+    }
+    fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
         let data_ref = node.data.borrow();
         let data = &data_ref.value;
         let sourcepos = data_ref.sourcepos;
@@ -132,7 +135,7 @@ impl Visitor for WikilinkVisitor {
         }
         Ok(())
     }
-    fn finalize_file(
+    fn _finalize_file(
         &mut self,
         _source: &str,
         _path: &std::path::Path,
@@ -140,7 +143,7 @@ impl Visitor for WikilinkVisitor {
         self.wikilinks.clear();
         Ok(())
     }
-    fn finalize(
+    fn _finalize(
         &mut self,
         _exclude: &[crate::rules::ErrorCode],
     ) -> Result<(), crate::visitor::FinalizeError> {
