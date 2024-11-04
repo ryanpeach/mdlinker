@@ -4,6 +4,7 @@ use mdlinker::rules::duplicate_alias;
 use mdlinker::rules::filter_code;
 
 use crate::common::get_report;
+use log::debug;
 
 use itertools::Itertools;
 
@@ -18,7 +19,7 @@ lazy_static! {
 fn number_of_duplicate_alias() {
     let report = get_report(PATHS.as_slice());
     for duplicate_alias in &report.duplicate_aliases {
-        println!("{duplicate_alias:?}");
+        debug!("{duplicate_alias:#?}");
     }
     assert_eq!(report.duplicate_aliases.len(), 2);
 }
@@ -27,7 +28,7 @@ fn number_of_duplicate_alias() {
 fn filename_alias_relation() {
     let report = get_report(PATHS.as_slice());
     for duplicate_alias in &report.duplicate_aliases {
-        println!("{duplicate_alias:?}");
+        debug!("{duplicate_alias:#?}");
     }
     let duplicate = filter_code(
         report.duplicate_aliases,
@@ -43,7 +44,7 @@ fn filename_alias_relation() {
 fn filecontent_filecontent_relation() {
     let report = get_report(PATHS.as_slice());
     for duplicate_alias in &report.duplicate_aliases {
-        println!("{duplicate_alias:?}");
+        debug!("{duplicate_alias:#?}");
     }
     let duplicate = filter_code(
         report.duplicate_aliases,

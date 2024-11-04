@@ -8,7 +8,7 @@ use std::{
 use comrak::{
     arena_tree::Node, nodes::Ast, parse_document, Arena, ExtensionOptionsBuilder, Options,
 };
-use log::debug;
+use log::{debug, trace};
 use thiserror::Error;
 
 use crate::rules::{duplicate_alias::NewDuplicateAliasError, ErrorCode};
@@ -32,14 +32,38 @@ pub enum FinalizeError {
 
 /// A trait for implementing an AST visitor pattern
 pub trait Visitor {
-    fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError>;
+    /// NOTE: Call this one
+    /// WARNING: Don't implment this, its already written for you.
+    /// Implement [`Self::_visit`] instead
+    fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
+        trace!("{:?} visiting node type: {:?}", self.name(), node.data.borrow().value);
+        self._visit(node, source)
+    }
+
+    fn finalize_file(&mut self, source: &str, path: &Path) -> Result<(), FinalizeError> {
+        trace!("{:?} finalizing file {:?}", self.name(), path);
+        self._finalize_file(source, path)
+    }
+
+    fn finalize(&mut self, exclude: &[ErrorCode]) -> Result<(), FinalizeError> {
+        trace!("{:?} finalizing", self.name());
+        self._finalize(exclude)
+    }
+
+    /// NOTE: Implement this one
+    /// WARNING: Don't call this one, its already called for you.
+    /// Call [`Self::visit`] instead
+    fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError>;
 
     /// Optional function that runs after every file
-    fn finalize_file(&mut self, _source: &str, _path: &Path) -> Result<(), FinalizeError>;
+    fn _finalize_file(&mut self, _source: &str, _path: &Path) -> Result<(), FinalizeError>;
 
     /// Optional function for doing something after visiting all nodes
     /// You have to run this yourself in lib, its not done in any of the funtions in this file for you
-    fn finalize(&mut self, _exclude: &[ErrorCode]) -> Result<(), FinalizeError>;
+    fn _finalize(&mut self, _exclude: &[ErrorCode]) -> Result<(), FinalizeError>;
+
+    /// Get a unique name for the visitor
+    fn name(&self) -> &str;
 }
 
 #[derive(Error, Debug)]
@@ -56,6 +80,7 @@ pub enum ParseError {
 
 /// Parse the source code and visit all the nodes using tree-sitter
 pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<(), ParseError> {
+    debug!("Parsing file {:?}", path);
     let source = std::fs::read_to_string(path)?;
 
     // Parse the source code
@@ -82,7 +107,6 @@ pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<
 
     // Pass the node to all the visitors
     for node in root.descendants() {
-        debug!("{:?}", node);
         for visitor in visitors.clone() {
             let mut visitor_cell = (*visitor).borrow_mut();
             visitor_cell.visit(node, &source)?;

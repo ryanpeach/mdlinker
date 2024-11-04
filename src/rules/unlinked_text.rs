@@ -38,7 +38,7 @@ pub struct UnlinkedText {
     src: NamedSource<String>,
 
     #[label("Alias")]
-    span: SourceSpan,
+    pub span: SourceSpan,
 
     #[help]
     advice: String,
@@ -86,15 +86,11 @@ impl UnlinkedTextVisitor {
     }
 }
 
-/// Checks if `span` is inside or equal to `other`
-fn span_inside(span: SourceSpan, other: SourceSpan) -> bool {
-    let span_end = span.offset() + span.len();
-    let other_end = other.offset() + other.len();
-    span.offset() >= other.offset() && span_end <= other_end
-}
-
 impl Visitor for UnlinkedTextVisitor {
-    fn visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
+    fn name(&self) -> &str {
+        "UnlinkedTextVisitor"
+    }
+    fn _visit(&mut self, node: &Node<RefCell<Ast>>, source: &str) -> Result<(), VisitError> {
         self.wikilink_visitor.visit(node, source)?;
         let data_ref = node.data.borrow();
         let data = &data_ref.value;
@@ -103,10 +99,12 @@ impl Visitor for UnlinkedTextVisitor {
         let mut get_new_unlinked_texts = |text: &str| {
             let lowercase_text = text.to_lowercase();
             for alias in self.alias_table.keys() {
+                debug_assert!(!alias.to_string().is_empty(), "How did an empty string get in the alias table");
                 if let Some(found) = lowercase_text.find(&alias.to_string()) {
                     // Make sure neither the character before or after is a letter
                     // This makes sure you aren't matching a part of a word
-                    if found > 0 && text.chars().nth(found - 1).unwrap().is_alphabetic() {
+                    // This should also handle tags
+                    if found > 0 && !text.chars().nth(found - 1).unwrap().is_whitespace() {
                         continue;
                     }
                     if found + alias.to_string().len() < text.len()
@@ -143,13 +141,6 @@ impl Visitor for UnlinkedTextVisitor {
                         }
                     }
 
-                    // Debug: TODO: Remove
-                    if source.contains(" overwhelm, sensory overload, overstimulation") {
-                        let parent_data_ref = parent.unwrap().data.borrow();
-                        let parent_data = format!("{:?}", &parent_data_ref.value);
-                        let parent_span = parent_data_ref.sourcepos;
-                        println!("Found alias: {}", alias.to_string());
-                    }
                     self.new_unlinked_texts.push((alias.clone(), span));
                 }
             }
@@ -162,7 +153,7 @@ impl Visitor for UnlinkedTextVisitor {
         }
         Ok(())
     }
-    fn finalize_file(
+    fn _finalize_file(
         &mut self,
         source: &str,
         path: &Path,
@@ -186,7 +177,7 @@ impl Visitor for UnlinkedTextVisitor {
         Ok(())
     }
 
-    fn finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
+    fn _finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
         // We can "take" this because we are putting it right back
         self.unlinked_texts = dedupe_by_code(filter_by_excludes(
             std::mem::take(&mut self.unlinked_texts),
