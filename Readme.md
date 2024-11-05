@@ -21,6 +21,16 @@ Uses git [pre-commit](https://pre-commit.com/) to integrate with your git workfl
 - [X] Duplicate Alias: If using something like [logseq aliases](https://unofficial-logseq-docs.gitbook.io/unofficial-logseq-docs/beginner-to-advance-features/aliases), make sure they are always unique (also compares them to filenames).
 - [X] Broken Wikilink: Some wikilinks linked resource does not exist. Maybe you should create the page, or maybe the link title is misspelled?
 - [X] Unlinked Text: Text was detected which is very similar to some file title or alias. Maybe you should wrap it as a link?
+
+# Future
+
+- [ ] LSP Implementation
+- [ ] Logseq Plugin
+
+## Maybe
+
+Id like to see if there are other plugins for these before implementing them myself.
+
 - [ ] Missing "Related To":
   - [ ] If one block contains 2 or more wikilinks, add each of them to each other's "Related To"
   - [ ] If one block with a wikilink has a subblock with a wikilink, add each of them to each other's "Related To"
@@ -36,3 +46,5 @@ Uses git [pre-commit](https://pre-commit.com/) to integrate with your git workfl
 - [ ] Logseq properties ":: style" (Won't implement, use yaml front matter)
 - [ ] Obsidian Folder Structure (Unknown, PRs welcome)
 - [ ] Obsidian Aliases (Unknown, PRs welcome)
+- [ ] [Marksman](https://github.com/artempyanykh/marksman)
+
