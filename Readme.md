@@ -21,6 +21,11 @@ Uses git [pre-commit](https://pre-commit.com/) to integrate with your git workfl
 - [X] Duplicate Alias: If using something like [logseq aliases](https://unofficial-logseq-docs.gitbook.io/unofficial-logseq-docs/beginner-to-advance-features/aliases), make sure they are always unique (also compares them to filenames).
 - [X] Broken Wikilink: Some wikilinks linked resource does not exist. Maybe you should create the page, or maybe the link title is misspelled?
 - [X] Unlinked Text: Text was detected which is very similar to some file title or alias. Maybe you should wrap it as a link?
+- [ ] RelatesTo: At least in logseq, I find it annoying the graph wont show two items as linked if they are linked within the same block. These will identify that and force you to link them in the frontmatter.
+  - RelatesToParagraph: Two wikilinks in the same paragraph
+  - RelatesToListItem: Two wikilinks in the same list item
+  - RelatesToListItemDescendant: One wikilink in a sublist item of another wikilinks listitem
+  - RelatesToNotFound: delete a relation which doesnt match any of the above for cleanliness 
 
 # Future
 
