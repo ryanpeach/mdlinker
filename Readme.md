@@ -32,14 +32,6 @@ Uses git [pre-commit](https://pre-commit.com/) to integrate with your git workfl
 - [ ] LSP Implementation
 - [ ] Logseq Plugin
 
-## Maybe
-
-Id like to see if there are other plugins for these before implementing them myself.
-
-- [ ] Missing "Related To":
-  - [ ] If one block contains 2 or more wikilinks, add each of them to each other's "Related To"
-  - [ ] If one block with a wikilink has a subblock with a wikilink, add each of them to each other's "Related To"
-
 # Compatibility
 
 - [X] Logseq Folder Structure
@@ -48,6 +40,7 @@ Id like to see if there are other plugins for these before implementing them mys
 - [X] Logseq Aliases (in Yaml Front Matter)
 - [X] `[[url]]` and `[[title|url]]` style wikilinks
 - [X] #[[url]] and #url tags
+- [ ] Marksman [[#url]] tags
 - [ ] Logseq properties ":: style" (Won't implement, use yaml front matter)
 - [ ] Obsidian Folder Structure (Unknown, PRs welcome)
 - [ ] Obsidian Aliases (Unknown, PRs welcome)
