@@ -44,6 +44,7 @@ pub(super) struct Config {
 
     /// Exclude certain error codes
     /// If an error code **starts with** this string, it will be excluded
+    /// This accepts glob patterns
     #[clap(short = 'e', long = "exclude")]
     pub exclude: Vec<String>,
 }
