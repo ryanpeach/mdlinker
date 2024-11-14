@@ -23,6 +23,7 @@ use comrak::{
 };
 use hashbrown::HashMap;
 use miette::{Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
+use regex::Regex;
 use thiserror::Error;
 
 use super::{
@@ -120,13 +121,14 @@ impl Visitor for UnlinkedTextVisitor {
         let sourcepos = data_ref.sourcepos;
         let parent = node.parent();
         if let NodeValue::Text(text) = data {
-            let lowercase_text = text.to_lowercase();
             for alias in self.alias_table.keys() {
-                if let Some(found) = lowercase_text.find(&alias.to_string()) {
+                let re = Regex::new(&format!("(?i){alias}"))
+                    .expect("The regex is just case insensitive string search");
+                if let Some(found) = re.find(text) {
                     // Make sure neither the character before or after is a letter
                     // This makes sure you aren't matching a part of a word
                     // This should also handle tags
-                    let found_char_index = text[..found].chars().count();
+                    let found_char_index = found.start();
                     if found_char_index > 0
                         && !text
                             .chars()

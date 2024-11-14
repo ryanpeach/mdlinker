@@ -1,8 +1,8 @@
 use mdlinker::config;
 use mdlinker::lib;
-use mdlinker::rules::Report;
+use mdlinker::rules::Report as MdReport;
 use mdlinker::rules::ThirdPassReport;
-use miette::{miette, Result};
+use miette::{miette, Report, Result};
 
 /// Really just a wrapper that loads the config and passes it to the main library function
 fn main() -> Result<()> {
@@ -14,26 +14,25 @@ fn main() -> Result<()> {
     let mut nb_errors = 0;
     match lib(&config) {
         Err(e) => {
-            eprintln!("{:?}", miette!(e));
-            return Err(miette!("Something went wrong during linting"));
+            return Err(Report::from(e));
         }
         Ok(e) => {
             println!();
             for report in e.reports {
                 match report {
-                    Report::SimilarFilename(e) => {
+                    MdReport::SimilarFilename(e) => {
                         nb_errors += 1;
                         eprintln!("{e:?}");
                     }
-                    Report::DuplicateAlias(e) => {
+                    MdReport::DuplicateAlias(e) => {
                         nb_errors += 1;
                         eprintln!("{e:?}");
                     }
-                    Report::ThirdPass(ThirdPassReport::BrokenWikilink(e)) => {
+                    MdReport::ThirdPass(ThirdPassReport::BrokenWikilink(e)) => {
                         nb_errors += 1;
                         eprintln!("{e:?}");
                     }
-                    Report::ThirdPass(ThirdPassReport::UnlinkedText(e)) => {
+                    MdReport::ThirdPass(ThirdPassReport::UnlinkedText(e)) => {
                         nb_errors += 1;
                         eprintln!("{e:?}");
                     }
