@@ -1,5 +1,4 @@
 use crate::{
-    config::Config,
     file::{
         content::{front_matter::FrontMatterVisitor, wikilink::Alias},
         name::{get_filename, Filename},
@@ -17,7 +16,7 @@ use std::{
 };
 use thiserror::Error;
 
-use super::{dedupe_by_code, filter_by_excludes, ErrorCode, FixError, HasId, Report, ReportTrait};
+use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId, Report};
 
 pub const CODE: &str = "name::alias::duplicate";
 
@@ -63,11 +62,6 @@ pub enum DuplicateAlias {
         #[related]
         other: Vec<Self>,
     },
-}
-impl ReportTrait for DuplicateAlias {
-    fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
-        Ok(None)
-    }
 }
 
 impl HasId for DuplicateAlias {

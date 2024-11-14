@@ -8,10 +8,10 @@ use std::{path::PathBuf, str::FromStr};
 fn groups_first_element_same() {
     info!("groups_first_element_same");
     let config = config::Config::builder()
-        .pages_directory(
-            PathBuf::from_str("./tests/logseq/similar_filename/assets/pages")
-                .expect("This is a constant"),
+        .directories(vec![PathBuf::from_str(
+            "./tests/logseq/similar_filename/assets/pages",
         )
+        .unwrap()])
         .filename_match_threshold(80)
         .build();
 
