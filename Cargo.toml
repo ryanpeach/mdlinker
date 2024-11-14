@@ -13,6 +13,7 @@ debug = false
 
 [dependencies]
 bon = "2.3.0"
+cached = "0.54.0"
 clap = { version = "4.5.16", features = ["derive"] }
 comrak = "0.29.0"
 derive_more = { version = "1.0.0", features = ["full"] }
