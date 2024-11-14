@@ -90,13 +90,28 @@ pub enum OutputErrors {
     FixError(#[from] rules::FixError),
 }
 
+use git2::{Error, Repository, StatusOptions};
+
+fn is_repo_dirty(repo: &Repository) -> Result<bool, Error> {
+    let mut options = StatusOptions::new();
+    options
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .exclude_submodules(true)
+        .include_unmodified(false)
+        .include_ignored(false);
+
+    let statuses = repo.statuses(Some(&mut options))?;
+    Ok(!statuses.is_empty())
+}
+
 /// Runs [`check`] in a loop until no more fixes can be made
 fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     // Check if the git repo is dirty
     match git2::Repository::open_from_env() {
-        Ok(git) => match git.statuses(None) {
-            Ok(git_status) => {
-                if !config.allow_dirty && !git_status.is_empty() {
+        Ok(git) => match is_repo_dirty(&git) {
+            Ok(is_dirty) => {
+                if !config.allow_dirty && is_dirty {
                     return Err(OutputErrors::FixError(rules::FixError::DirtyRepo));
                 }
             }
