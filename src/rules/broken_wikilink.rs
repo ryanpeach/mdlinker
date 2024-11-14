@@ -4,7 +4,6 @@ use std::{
 };
 
 use crate::{
-    config::Config,
     file::{
         content::wikilink::{Alias, WikilinkVisitor},
         name::{get_filename, Filename},
@@ -18,10 +17,7 @@ use hashbrown::HashMap;
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
 use thiserror::Error;
 
-use super::{
-    dedupe_by_code, filter_by_excludes, ErrorCode, FixError, HasId, Report, ReportTrait,
-    ThirdPassReport,
-};
+use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId, Report, ThirdPassReport};
 
 pub const CODE: &str = "content::wikilink::broken";
 
@@ -40,20 +36,6 @@ pub struct BrokenWikilink {
 
     #[help]
     advice: String,
-}
-
-impl ReportTrait for BrokenWikilink {
-    /// Create a new file called the text under the span
-    fn fix(&self, config: &Config) -> Result<Option<()>, FixError> {
-        let source = self.src.inner();
-        let wikilink = source[self.wikilink.offset()..self.wikilink.offset() + self.wikilink.len()]
-            .to_string();
-        let alias = wikilink.trim_start_matches("[[").trim_end_matches("]]");
-        let filename = format!("{alias}.md");
-        let path = config.pages_directory.join(filename);
-        std::fs::write(path, "")?;
-        Ok(Some(()))
-    }
 }
 
 impl PartialEq for BrokenWikilink {
@@ -95,7 +77,6 @@ impl BrokenWikilinkVisitor {
         }
     }
 }
-
 impl Visitor for BrokenWikilinkVisitor {
     fn name(&self) -> &'static str {
         "BrokenWikilinkVisitor"

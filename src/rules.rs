@@ -1,32 +1,26 @@
 //! Defines Rules and creates Reports based on those rules
 //!
 //! # Terminology
-//! * A [`Rule`] is a thing like [`crate::rules::similar_filename::SimilarFilename`], which are all public structs which derive
+//! * A Rule is a thing like [`crate::rules::similar_filename::SimilarFilename`], which are all public structs which derive
 //!   [`thiserror::Error`]
-//!   and [`miette::Diagnostic`] inside [`crate::rules`]. It is the "type itself" not a specific instance of that type. In `strum` a similar concept is called a "Discriminant".
-//! * A [`Report`] is the result of a rule, like "These two filenames are similar".
-//!   Some [`Report`]s are [`Fixable`], meaning they can be auto-handled with the cli argument
-//!   `--fix`
+//!   and [`miette::Diagnostic`] inside [`crate::rules`]
+//! * A Report is the result of a rule, like "These two filenames are similar".
 //!   Reports all implement [`crate::rules::HasId`].
 
 use derive_more::derive::{Constructor, From, Into};
 use glob::Pattern;
-use miette::Diagnostic;
 use strum_macros::{EnumDiscriminants, EnumIter};
-use thiserror::Error;
 
-use crate::config::Config;
-
-#[derive(Debug, EnumDiscriminants, Clone)]
+#[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
-#[strum_discriminants(name(Rule))]
+#[strum_discriminants(name(Rules))]
 pub enum Report {
     SimilarFilename(similar_filename::SimilarFilename),
     DuplicateAlias(duplicate_alias::DuplicateAlias),
     ThirdPass(ThirdPassReport),
 }
 
-#[derive(Debug, EnumDiscriminants, Clone)]
+#[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
 #[strum_discriminants(name(ThirdPassRule))]
 pub enum ThirdPassReport {
@@ -87,24 +81,6 @@ impl<T: HasId + PartialOrd> VecHasIdExtensions<T> for Vec<T> {
     fn finalize(self, excludes: &[ErrorCode]) -> Self {
         dedupe_by_code(filter_by_excludes(self, excludes))
     }
-}
-
-#[derive(Error, Debug, Diagnostic)]
-pub enum FixError {
-    #[error("The git repo is dirty")]
-    #[help("Please commit or stash your changes")]
-    DirtyRepo,
-    #[error(transparent)]
-    GitError(#[from] git2::Error),
-    #[error(transparent)]
-    IOError(#[from] std::io::Error),
-}
-
-pub trait ReportTrait {
-    /// Returns a [`FixError`] if it tried to fix things but failed
-    /// Returns [`Some`] if it fixed things
-    /// Returns [`None`] if it did not even try to fix things
-    fn fix(&self, config: &Config) -> Result<Option<()>, FixError>;
 }
 
 pub mod broken_wikilink;
