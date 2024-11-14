@@ -8,7 +8,7 @@ use crate::{
     config::Config,
     file::{
         content::wikilink::{Alias, WikilinkVisitor},
-        name::{get_filename, Filename},
+        name::{get_filename, Filename, FilenameLowercase},
     },
     sed::ReplacePair,
     visitor::{FinalizeError, VisitError, Visitor},
@@ -49,9 +49,9 @@ impl ReportTrait for BrokenWikilink {
         let source = self.src.inner();
         let wikilink = source[self.wikilink.offset()..self.wikilink.offset() + self.wikilink.len()]
             .to_string();
-        let alias = wikilink.trim_start_matches("[[").trim_end_matches("]]");
-        let filename = format!("{alias}.md");
-        let path = config.pages_directory.join(filename);
+        let alias = Alias::new(wikilink.trim_start_matches("[[").trim_end_matches("]]"));
+        let filename = FilenameLowercase::from_alias(&alias, config);
+        let path = config.pages_directory.join(filename.to_string());
         std::fs::write(path.clone(), "").map_err(|source| FixError::IOError {
             source,
             backtrace: Backtrace::force_capture(),

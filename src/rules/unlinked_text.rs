@@ -61,7 +61,7 @@ impl ReportTrait for UnlinkedText {
         source.insert_str(start, "[[");
         std::fs::write(self.src.name(), source).map_err(|source| FixError::IOError {
             source,
-            file: self.src.name().to_string(),
+            file: self.src.name().to_owned(),
             backtrace: Backtrace::force_capture(),
         })?;
         Ok(Some(()))
@@ -158,7 +158,7 @@ impl Visitor for UnlinkedTextVisitor {
                             .offset()
                                 + found_char_index)
                                 .into(),
-                            alias.to_string().len(),
+                            alias.len(),
                         ),
                         node,
                     );
