@@ -1,4 +1,5 @@
 use crate::{
+    config::Config,
     file::name::get_filename,
     ngrams::{MissingSubstringError, Ngram},
     rules::HasId,
@@ -15,7 +16,7 @@ use std::{
 };
 use thiserror::Error;
 
-use super::ErrorCode;
+use super::{ErrorCode, FixError, ReportTrait};
 
 pub const CODE: &str = "name::similar";
 
@@ -39,6 +40,11 @@ pub struct SimilarFilename {
 
     #[help]
     advice: String,
+}
+impl ReportTrait for SimilarFilename {
+    fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
+        Ok(None)
+    }
 }
 
 impl PartialOrd for SimilarFilename {

@@ -18,13 +18,13 @@ fn setup() {
 #[must_use]
 pub fn get_report(paths: &[String]) -> mdlinker::OutputReport {
     setup();
+    let paths: Vec<PathBuf> = paths
+        .iter()
+        .map(|path| PathBuf::from_str(path).expect("This path exists at compile time."))
+        .collect();
     let config = config::Config::builder()
-        .directories(
-            paths
-                .iter()
-                .map(|path| PathBuf::from_str(path).expect("This path exists at compile time."))
-                .collect(),
-        )
+        .pages_directory(paths[0].clone())
+        .other_directories(paths[1..].to_vec())
         .build();
 
     lib(&config).expect("There should have been no error.")
