@@ -6,7 +6,12 @@ use std::{
 
 use regex::Regex;
 
-use crate::ngrams::{up_to_n, Ngram};
+use crate::{
+    config::Config,
+    ngrams::{up_to_n, Ngram},
+};
+
+use super::content::wikilink::Alias;
 
 /// A filename is a representation of the file name in its original casing
 /// And with its original seperators
@@ -48,6 +53,11 @@ impl FilenameLowercase {
     #[must_use]
     pub fn new(filename: &str) -> Self {
         Self(filename.to_owned().to_lowercase())
+    }
+
+    #[must_use]
+    pub fn from_alias(alias: &Alias, config: &Config) -> FilenameLowercase {
+        config.alias_to_filename.apply(alias)
     }
 }
 
