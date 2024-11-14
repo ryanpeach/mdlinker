@@ -8,6 +8,7 @@
 //!   Reports all implement [`crate::rules::HasId`].
 
 use derive_more::derive::{Constructor, From, Into};
+use glob::Pattern;
 use strum_macros::{EnumDiscriminants, EnumIter};
 
 #[derive(Debug, EnumDiscriminants)]
@@ -58,10 +59,9 @@ where
 fn filter_by_excludes<T: HasId>(mut this: Vec<T>, excludes: &[ErrorCode]) -> Vec<T> {
     this.retain(|item| {
         !excludes.iter().any(|exclude| {
-            item.id()
-                .0
-                .to_lowercase()
-                .starts_with(&exclude.0.to_lowercase())
+            Pattern::new(&exclude.0.to_lowercase())
+                .map(|pattern| pattern.matches(&item.id().0.to_lowercase()))
+                .unwrap_or(false)
         })
     });
     this

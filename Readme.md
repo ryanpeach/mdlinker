@@ -15,6 +15,12 @@ Uses git [pre-commit](https://pre-commit.com/) to integrate with your git workfl
 
 > **_NOTE:_** Linking works best when you spell things correctly, in both your filenames and file contents. Consider pairing this tool with a spell checker.
 
+# Configuration
+
+Put a `mdlinker.toml` in your project root to configure the linter.
+
+Options are defined in [`src/config/file.rs`](src/config/file.rs) as a serde object, and can be overwritten in the cli, see `mdlinker --help`.
+
 # Lint Rules
 
 - [X] Similar Files: Two files share a very similar title. Maybe you should combine them! Uses a fuzzy finder and ngram similarity. O(n^2) complexity in the number of files.
@@ -25,7 +31,7 @@ Uses git [pre-commit](https://pre-commit.com/) to integrate with your git workfl
   - RelatesToParagraph: Two wikilinks in the same paragraph
   - RelatesToListItem: Two wikilinks in the same list item
   - RelatesToListItemDescendant: One wikilink in a sublist item of another wikilinks listitem
-  - RelatesToNotFound: delete a relation which doesnt match any of the above for cleanliness 
+  - RelatesToNotFound: delete a relation which doesnt match any of the above for cleanliness
 
 # Future
 
@@ -45,4 +51,3 @@ Uses git [pre-commit](https://pre-commit.com/) to integrate with your git workfl
 - [ ] Obsidian Folder Structure (Unknown, PRs welcome)
 - [ ] Obsidian Aliases (Unknown, PRs welcome)
 - [ ] [Marksman](https://github.com/artempyanykh/marksman)
-
