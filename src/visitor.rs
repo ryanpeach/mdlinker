@@ -22,6 +22,14 @@ pub enum VisitError {
         #[backtrace]
         backtrace: std::backtrace::Backtrace,
     },
+
+    #[error("Error making patterns from aliases")]
+    AhoBuildError {
+        #[from]
+        source: aho_corasick::BuildError,
+        #[backtrace]
+        backtrace: std::backtrace::Backtrace,
+    },
 }
 
 #[derive(Error, Debug)]

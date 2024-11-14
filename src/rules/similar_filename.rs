@@ -154,7 +154,7 @@ impl SimilarFilename {
         } else {
             #[allow(clippy::cast_sign_loss)]
             #[allow(clippy::cast_possible_truncation)]
-            Some(ProgressBar::new((n * (n + 1.0) / 2.0) as u64))
+            Some(ProgressBar::new((n * (n + 1.0) / 2.0) as u64).with_prefix("Crosschecking files"))
         };
         let matcher = SkimMatcherV2::default();
         let mut matches: Vec<SimilarFilename> = Vec::new();

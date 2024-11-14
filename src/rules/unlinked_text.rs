@@ -10,13 +10,12 @@ use crate::{
     sed::ReplacePair,
     visitor::{FinalizeError, VisitError, Visitor},
 };
+use aho_corasick::AhoCorasick;
 use bon::Builder;
-use cached::proc_macro::cached;
 use comrak::{
     arena_tree::Node,
     nodes::{Ast, NodeValue},
 };
-use fancy_regex::Regex;
 use hashbrown::HashMap;
 use miette::{Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
 use std::{
@@ -111,11 +110,45 @@ impl UnlinkedTextVisitor {
     }
 }
 
-#[cached]
-fn get_regex(alias: Alias) -> Regex {
-    // Compile the regex and cache it based on the alias
-    let pattern = format!(r"(?i)(?<![\w#]){alias}(?!\w)");
-    Regex::new(&pattern).expect("The regex is just case insensitive string search")
+/// Checks if the match at the given start and end indices is a whole word match.
+fn is_whole_word_match(text: &str, start: usize, end: usize) -> bool {
+    is_start_boundary(text, start) && is_end_boundary(text, end) && !is_start_hashtag(text, start)
+}
+
+/// Checks if the character before the start index is a word boundary.
+fn is_start_boundary(text: &str, start: usize) -> bool {
+    if start == 0 {
+        true
+    } else {
+        text[..start]
+            .chars()
+            .next_back()
+            .map_or(true, |c| !c.is_alphanumeric())
+    }
+}
+
+/// Checks if the character before the start index is a word boundary.
+fn is_start_hashtag(text: &str, start: usize) -> bool {
+    if start == 0 {
+        false
+    } else {
+        text[..start]
+            .chars()
+            .next_back()
+            .map_or(false, |c| c == '#')
+    }
+}
+
+/// Checks if the character after the end index is a word boundary.
+fn is_end_boundary(text: &str, end: usize) -> bool {
+    if end == text.len() {
+        true
+    } else {
+        text[end..]
+            .chars()
+            .next()
+            .map_or(true, |c| !c.is_alphanumeric())
+    }
 }
 
 impl Visitor for UnlinkedTextVisitor {
@@ -129,40 +162,47 @@ impl Visitor for UnlinkedTextVisitor {
         let sourcepos = data_ref.sourcepos;
         let parent = node.parent();
         if let NodeValue::Text(text) = data {
-            for alias in self.alias_table.keys() {
-                // Make sure neither the character before or after is a letter
-                // This makes sure you aren't matching a part of a word
-                // This should also handle tags
-                // Check the character before the match
-
-                let re = get_regex(alias.clone());
-                if let Ok(Some(found)) = re.find(text) {
-                    // Get our span
-                    let span = repair_span_due_to_frontmatter(
-                        SourceSpan::new(
-                            (SourceOffset::from_location(
-                                remove_frontmatter_from_source(source, node),
-                                sourcepos.start.line,
-                                sourcepos.start.column,
-                            )
-                            .offset()
-                                + found.start())
-                            .into(),
-                            alias.to_string().len(),
-                        ),
-                        node,
-                    );
-
-                    // Dont match inside wikilinks
-                    if let Some(parent) = parent {
-                        if let NodeValue::WikiLink(_) = parent.data.borrow().value {
-                            // If this is already in a link, skip it
-                            continue;
-                        }
-                    }
-
-                    self.new_unlinked_texts.push((alias.clone(), span));
+            let patterns: Vec<String> = self
+                .alias_table
+                .keys()
+                .map(std::string::ToString::to_string)
+                .collect();
+            let ac = AhoCorasick::builder()
+                .ascii_case_insensitive(true)
+                .build(&patterns)?;
+            // Make sure neither the character before or after is a letter
+            // This makes sure you aren't matching a part of a word
+            // This should also handle tags
+            // Check the character before the match
+            for found in ac.find_iter(text) {
+                if !is_whole_word_match(text, found.start(), found.end()) {
+                    continue;
                 }
+                let alias = Alias::new(&patterns[found.pattern().as_usize()]);
+                let span = repair_span_due_to_frontmatter(
+                    SourceSpan::new(
+                        (SourceOffset::from_location(
+                            remove_frontmatter_from_source(source, node),
+                            sourcepos.start.line,
+                            sourcepos.start.column,
+                        )
+                        .offset()
+                            + found.start())
+                        .into(),
+                        found.end() - found.start(),
+                    ),
+                    node,
+                );
+
+                // Dont match inside wikilinks
+                if let Some(parent) = parent {
+                    if let NodeValue::WikiLink(_) = parent.data.borrow().value {
+                        // If this is already in a link, skip it
+                        continue;
+                    }
+                }
+
+                self.new_unlinked_texts.push((alias, span));
             }
         }
         Ok(())

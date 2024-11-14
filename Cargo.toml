@@ -12,13 +12,12 @@ opt-level = 3
 debug = false
 
 [dependencies]
+aho-corasick = "1.1.3"
 bon = "2.3.0"
-cached = "0.54.0"
 clap = { version = "4.5.16", features = ["derive"] }
 comrak = "0.29.0"
 derive_more = { version = "1.0.0", features = ["full"] }
 env_logger = "0.11.5"
-fancy-regex = "0.14.0"
 fuzzy-matcher = "0.3.7"
 getset = "0.1.3"
 git2 = "0.19.0"
