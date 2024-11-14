@@ -15,9 +15,11 @@ use super::{NewConfigError, Partial};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub(super) struct Config {
-    /// See [`super::cli::Config::directories`]
-    #[serde(default)]
-    pub directories: Vec<PathBuf>,
+    /// See [`super::cli::Config::pages_directory`]
+    pub pages_directory: PathBuf,
+
+    /// See [`super::cli::Config::other_directories`]
+    pub other_directories: Vec<PathBuf>,
 
     /// See [`super::cli::Config::ngram_size`]
     #[serde(default)]
@@ -63,8 +65,11 @@ impl Config {
 }
 
 impl Partial for Config {
-    fn directories(&self) -> Option<Vec<PathBuf>> {
-        let out = self.directories.clone();
+    fn pages_directory(&self) -> Option<PathBuf> {
+        Some(self.pages_directory.clone())
+    }
+    fn other_directories(&self) -> Option<Vec<PathBuf>> {
+        let out = self.other_directories.clone();
         if out.is_empty() {
             None
         } else {
@@ -127,5 +132,11 @@ impl Partial for Config {
                 regex::Error::Syntax("From is empty".to_string()),
             ))),
         }
+    }
+    fn fix(&self) -> Option<bool> {
+        None
+    }
+    fn allow_dirty(&self) -> Option<bool> {
+        None
     }
 }

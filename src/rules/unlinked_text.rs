@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    config::Config,
     file::{
         content::{
             front_matter::{remove_frontmatter_from_source, repair_span_due_to_frontmatter},
@@ -23,7 +24,10 @@ use hashbrown::HashMap;
 use miette::{Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
 use thiserror::Error;
 
-use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId, Report, ThirdPassReport};
+use super::{
+    dedupe_by_code, filter_by_excludes, ErrorCode, FixError, HasId, Report, ReportTrait,
+    ThirdPassReport,
+};
 
 pub const CODE: &str = "content::alias::unlinked";
 
@@ -44,6 +48,19 @@ pub struct UnlinkedText {
 
     #[help]
     advice: String,
+}
+
+impl ReportTrait for UnlinkedText {
+    /// Open the file, surround the span in [[ ]], then save it
+    fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
+        let mut source = self.src.inner().clone();
+        let start = self.span.offset();
+        let end = start + self.span.len();
+        source.insert_str(end, "]]");
+        source.insert_str(start, "[[");
+        std::fs::write(self.src.name(), source)?;
+        Ok(Some(()))
+    }
 }
 
 impl PartialEq for UnlinkedText {

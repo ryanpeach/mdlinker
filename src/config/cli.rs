@@ -15,10 +15,14 @@ use super::Partial;
 #[derive(Parser, Default)]
 #[command(version, about, long_about = None)]
 pub(super) struct Config {
-    /// The directories to search in
-    /// May provide more than one directory
+    /// The pages directory is the directory where pages are named for their alias
+    /// and where new pages should be created when running --fix
+    #[clap(short = 'p', long = "pages")]
+    pub pages_directory: Option<PathBuf>,
+
+    /// Other directories to search in
     #[clap(short = 'd', long = "dir")]
-    pub directories: Vec<PathBuf>,
+    pub other_directories: Vec<PathBuf>,
 
     /// Path to a configuration file
     #[clap(short = 'c', long = "config", default_value = "mdlinker.toml")]
@@ -47,11 +51,23 @@ pub(super) struct Config {
     /// This accepts glob patterns
     #[clap(short = 'e', long = "exclude")]
     pub exclude: Vec<String>,
+
+    /// Whether or not to try to fix the errors
+    #[clap(short = 'f', long = "fix")]
+    pub fix: bool,
+
+    /// Whether or not to allow fixing in a "dirty" git repo, meaning
+    /// the git repo has uncommitted changes
+    #[clap(long = "allow-dirty")]
+    pub allow_dirty: bool,
 }
 
 impl Partial for Config {
-    fn directories(&self) -> Option<Vec<PathBuf>> {
-        let out = self.directories.clone();
+    fn pages_directory(&self) -> Option<PathBuf> {
+        self.pages_directory.clone()
+    }
+    fn other_directories(&self) -> Option<Vec<PathBuf>> {
+        let out = self.other_directories.clone();
         if out.is_empty() {
             None
         } else {
@@ -87,5 +103,11 @@ impl Partial for Config {
         &self,
     ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairCompilationError>> {
         None
+    }
+    fn fix(&self) -> Option<bool> {
+        Some(self.fix)
+    }
+    fn allow_dirty(&self) -> Option<bool> {
+        Some(self.allow_dirty)
     }
 }

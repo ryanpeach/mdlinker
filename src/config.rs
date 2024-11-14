@@ -12,12 +12,13 @@ use crate::{
 };
 use bon::Builder;
 use clap::Parser;
+use miette::Diagnostic;
 use std::io;
 use thiserror;
 use toml;
 
 /// Errors derived from config file reads
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Diagnostic)]
 pub enum NewConfigError {
     #[error("The config file at {path} does not exist")]
     FileDoesNotExistError { path: PathBuf },
@@ -27,15 +28,20 @@ pub enum NewConfigError {
     FileDoesNotParseError(#[from] toml::de::Error),
     #[error("ReplacePair compilation error")]
     ReplacePairCompilationError(#[from] ReplacePairCompilationError),
+    #[error("Pages directory missing")]
+    #[help("Please provide a pages directory argument in either your cli or config file")]
+    PagesDirectoryMissing,
 }
 
 /// Config which contains both the cli and the config file
 /// Used to reconcile the two
 #[derive(Builder)]
 pub struct Config {
-    /// See [`self::cli::Config::directories`]
-    #[builder(default=vec![PathBuf::from(".")])]
-    pub directories: Vec<PathBuf>,
+    /// See [`self::cli::Config::pages_directory`]
+    pub pages_directory: PathBuf,
+    /// See [`self::cli::Config::other_directories`]
+    #[builder(default=vec![])]
+    pub other_directories: Vec<PathBuf>,
     /// See [`self::cli::Config::ngram_size`]
     #[builder(default = 2)]
     pub ngram_size: usize,
@@ -57,6 +63,12 @@ pub struct Config {
     /// See [`self::file::Config::alias_to_filename`]
     #[builder(default=ReplacePair::new(r"/", r"___").expect("Constant"))]
     pub alias_to_filename: ReplacePair<Alias, FilenameLowercase>,
+    /// See [`self::cli::Config::fix`]
+    #[builder(default = false)]
+    pub fix: bool,
+    /// See [`self::cli::Config::allow_dirty`]
+    #[builder(default = false)]
+    pub allow_dirty: bool,
 }
 
 /// Things which implement the partial config trait
@@ -64,7 +76,8 @@ pub struct Config {
 /// these can be unioned with one another
 /// and then we can use that to create the final config
 pub trait Partial {
-    fn directories(&self) -> Option<Vec<PathBuf>>;
+    fn pages_directory(&self) -> Option<PathBuf>;
+    fn other_directories(&self) -> Option<Vec<PathBuf>>;
     fn ngram_size(&self) -> Option<usize>;
     fn boundary_pattern(&self) -> Option<String>;
     fn filename_spacing_pattern(&self) -> Option<String>;
@@ -76,6 +89,8 @@ pub trait Partial {
     fn alias_to_filename(
         &self,
     ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairCompilationError>>;
+    fn fix(&self) -> Option<bool>;
+    fn allow_dirty(&self) -> Option<bool>;
 }
 
 /// Now we implement a combine function for patrial configs which
@@ -83,9 +98,8 @@ pub trait Partial {
 /// config.
 ///
 /// Note: This makes last elements in the input slice first priority
-fn combine_partials(partials: &[&dyn Partial]) -> Result<Config, ReplacePairCompilationError> {
+fn combine_partials(partials: &[&dyn Partial]) -> Result<Config, NewConfigError> {
     Ok(Config::builder()
-        .maybe_directories(partials.iter().find_map(|p| p.directories()))
         .maybe_ngram_size(partials.iter().find_map(|p| p.ngram_size()))
         .maybe_boundary_pattern(partials.iter().find_map(|p| p.boundary_pattern()))
         .maybe_filename_spacing_pattern(partials.iter().find_map(|p| p.filename_spacing_pattern()))
@@ -93,14 +107,23 @@ fn combine_partials(partials: &[&dyn Partial]) -> Result<Config, ReplacePairComp
         .maybe_exclude(partials.iter().find_map(|p| p.exclude()))
         .maybe_filename_to_alias(match partials.iter().find_map(|p| p.filename_to_alias()) {
             Some(Ok(pair)) => Some(pair),
-            Some(Err(e)) => return Err(e),
+            Some(Err(e)) => return Err(NewConfigError::ReplacePairCompilationError(e)),
             None => None,
         })
         .maybe_alias_to_filename(match partials.iter().find_map(|p| p.alias_to_filename()) {
             Some(Ok(pair)) => Some(pair),
-            Some(Err(e)) => return Err(e),
+            Some(Err(e)) => return Err(NewConfigError::ReplacePairCompilationError(e)),
             None => None,
         })
+        .maybe_fix(partials.iter().find_map(|p| p.fix()))
+        .maybe_allow_dirty(partials.iter().find_map(|p| p.allow_dirty()))
+        .pages_directory(
+            partials
+                .iter()
+                .find_map(|p| p.pages_directory())
+                .ok_or(NewConfigError::PagesDirectoryMissing)?,
+        )
+        .maybe_other_directories(partials.iter().find_map(|p| p.other_directories()))
         .build())
 }
 
@@ -130,5 +153,14 @@ impl Config {
 
         // CLI has priority over file by being last
         combine_partials(&[&file, &cli]).map_err(derive_more::Into::into)
+    }
+
+    /// Legacy directories function
+    /// Gets all the directories into one vec
+    #[must_use]
+    pub fn directories(&self) -> Vec<PathBuf> {
+        let mut out = vec![self.pages_directory.clone()];
+        out.extend(self.other_directories.clone());
+        out
     }
 }
