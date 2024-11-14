@@ -1,7 +1,7 @@
 use std::{cell::RefCell, path::Path};
 
 use crate::{
-    rules::ErrorCode,
+    rules::{ErrorCode, Report},
     visitor::{VisitError, Visitor},
 };
 use comrak::{
@@ -111,8 +111,11 @@ impl Visitor for FrontMatterVisitor {
         self.aliases.clear();
         Ok(())
     }
-    fn _finalize(&mut self, _exclude: &[ErrorCode]) -> Result<(), crate::visitor::FinalizeError> {
+    fn _finalize(
+        &mut self,
+        _exclude: &[ErrorCode],
+    ) -> Result<Vec<Report>, crate::visitor::FinalizeError> {
         self.aliases.clear();
-        Ok(())
+        Ok(vec![])
     }
 }

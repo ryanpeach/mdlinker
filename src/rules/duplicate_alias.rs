@@ -16,11 +16,11 @@ use std::{
 };
 use thiserror::Error;
 
-use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId};
+use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId, Report};
 
 pub const CODE: &str = "name::alias::duplicate";
 
-#[derive(Error, Debug, Diagnostic)]
+#[derive(Error, Debug, Diagnostic, Clone)]
 #[error("A wikilink does not have a corresponding page")]
 #[diagnostic(code("name::alias::duplicate"))]
 pub enum DuplicateAlias {
@@ -156,7 +156,7 @@ impl Visitor for DuplicateAliasVisitor {
         self.front_matter_visitor.finalize_file(source, path)?;
         Ok(())
     }
-    fn _finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
+    fn _finalize(&mut self, excludes: &[ErrorCode]) -> Result<Vec<Report>, FinalizeError> {
         // We can "take" the duplicate from the front_matter_visitor since we are going to put them
         // right back in after some cleaning
         self.duplicate_alias_errors = dedupe_by_code(filter_by_excludes(
@@ -164,7 +164,11 @@ impl Visitor for DuplicateAliasVisitor {
             excludes,
         ));
         self.front_matter_visitor.finalize(excludes)?;
-        Ok(())
+        Ok(self
+            .duplicate_alias_errors
+            .iter()
+            .map(|x| Report::DuplicateAlias(x.clone()))
+            .collect())
     }
 }
 

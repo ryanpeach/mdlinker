@@ -23,11 +23,11 @@ use hashbrown::HashMap;
 use miette::{Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
 use thiserror::Error;
 
-use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId};
+use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId, Report, ThirdPassReport};
 
 pub const CODE: &str = "content::alias::unlinked";
 
-#[derive(Error, Debug, Diagnostic, Builder)]
+#[derive(Error, Debug, Diagnostic, Builder, Clone)]
 #[error("Found text which could probably be put in a wikilink")]
 #[diagnostic(code("content::alias::unlinked"))]
 pub struct UnlinkedText {
@@ -177,13 +177,17 @@ impl Visitor for UnlinkedTextVisitor {
         Ok(())
     }
 
-    fn _finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
+    fn _finalize(&mut self, excludes: &[ErrorCode]) -> Result<Vec<Report>, FinalizeError> {
         // We can "take" this because we are putting it right back
         self.unlinked_texts = dedupe_by_code(filter_by_excludes(
             std::mem::take(&mut self.unlinked_texts),
             excludes,
         ));
         self.wikilink_visitor.finalize(excludes)?;
-        Ok(())
+        Ok(self
+            .unlinked_texts
+            .iter()
+            .map(|x| Report::ThirdPass(ThirdPassReport::UnlinkedText(x.clone())))
+            .collect())
     }
 }

@@ -9,16 +9,14 @@ pub mod visitor;
 
 use std::{cell::RefCell, rc::Rc};
 
-use bon::Builder;
 use file::{get_files, name::ngrams};
 use miette::Result;
 use ngrams::MissingSubstringError;
 use rules::{
-    broken_wikilink::{BrokenWikilink, BrokenWikilinkVisitor},
-    duplicate_alias::{DuplicateAlias, DuplicateAliasVisitor},
-    similar_filename::SimilarFilename,
-    unlinked_text::UnlinkedText,
+    broken_wikilink::BrokenWikilinkVisitor, duplicate_alias::DuplicateAliasVisitor,
+    similar_filename::SimilarFilename, Report, ThirdPassRule,
 };
+use strum::IntoEnumIterator;
 use thiserror::Error;
 use visitor::{parse, FinalizeError, ParseError, Visitor};
 
@@ -26,19 +24,56 @@ use crate::rules::VecHasIdExtensions;
 
 /// A miette diagnostic that controls the printout of errors to the user
 /// Put a vector of all outputs in a new field with a #[related] macro above it
-#[derive(Debug, Builder)]
+#[derive(Debug)]
 pub struct OutputReport {
-    pub similar_filenames: Vec<SimilarFilename>,
-    pub duplicate_aliases: Vec<DuplicateAlias>,
-    pub broken_wikilinks: Vec<BrokenWikilink>,
-    pub unlinked_texts: Vec<UnlinkedText>,
+    pub reports: Vec<Report>,
 }
 
 impl OutputReport {
     /// Get if this is empty
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.similar_filenames.is_empty() && self.broken_wikilinks.is_empty()
+        self.reports.is_empty()
+    }
+    #[must_use]
+    pub fn broken_wikilinks(&self) -> Vec<rules::broken_wikilink::BrokenWikilink> {
+        self.reports
+            .iter()
+            .filter_map(|x| match x {
+                Report::ThirdPass(rules::ThirdPassReport::BrokenWikilink(x)) => Some(x.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+    #[must_use]
+    pub fn unlinked_texts(&self) -> Vec<rules::unlinked_text::UnlinkedText> {
+        self.reports
+            .iter()
+            .filter_map(|x| match x {
+                Report::ThirdPass(rules::ThirdPassReport::UnlinkedText(x)) => Some(x.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+    #[must_use]
+    pub fn duplicate_aliases(&self) -> Vec<rules::duplicate_alias::DuplicateAlias> {
+        self.reports
+            .iter()
+            .filter_map(|x| match x {
+                Report::DuplicateAlias(x) => Some(x.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+    #[must_use]
+    pub fn similar_filenames(&self) -> Vec<rules::similar_filename::SimilarFilename> {
+        self.reports
+            .iter()
+            .filter_map(|x| match x {
+                Report::SimilarFilename(x) => Some(x.clone()),
+                _ => None,
+            })
+            .collect()
     }
 }
 
@@ -77,7 +112,10 @@ pub fn lib(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         &filename_spacing_regex,
     );
 
-    // All our reports
+    let mut reports: Vec<Report> = vec![];
+
+    // First pass
+    // Just over filenames
     // NOTE: Always use `filter_by_excludes` and `dedupe_by_code` on the reports
     let similar_filenames = SimilarFilename::calculate(
         &file_ngrams,
@@ -85,7 +123,14 @@ pub fn lib(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         &filename_spacing_regex,
     )?
     .finalize(&config.exclude);
+    reports.extend(
+        similar_filenames
+            .iter()
+            .map(|x| Report::SimilarFilename(x.clone())),
+    );
 
+    // Second pass
+    // This gives us metadata we need for all other rules from the content of files
     //  The duplicate alias visitor has to run first to get the table of aliases
     let duplicate_alias_visitor = Rc::new(RefCell::new(DuplicateAliasVisitor::new(
         &all_files,
@@ -99,43 +144,35 @@ pub fn lib(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         Rc::try_unwrap(duplicate_alias_visitor)
             .expect("visitors vector went out of scope")
             .into_inner();
-    duplicate_alias_visitor.finalize(&config.exclude)?;
+    reports.extend(duplicate_alias_visitor.finalize(&config.exclude)?);
 
-    // The broken wikilinks visitor
-    let broken_wikilinks_visitor = Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
-        &all_files,
-        &config.filename_to_alias,
-        duplicate_alias_visitor.alias_table.clone(),
-    )));
-    let unlinked_text_visitor = Rc::new(RefCell::new(
-        rules::unlinked_text::UnlinkedTextVisitor::new(
-            &all_files,
-            &config.filename_to_alias,
-            duplicate_alias_visitor.alias_table,
-        ),
-    ));
-    for file in &all_files {
-        let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![
-            broken_wikilinks_visitor.clone(),
-            unlinked_text_visitor.clone(),
-        ];
-        parse(file, visitors)?;
+    // Third Pass
+    let mut visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![];
+    for rule in ThirdPassRule::iter() {
+        visitors.push(match rule {
+            ThirdPassRule::UnlinkedText => Rc::new(RefCell::new(
+                rules::unlinked_text::UnlinkedTextVisitor::new(
+                    &all_files,
+                    &config.filename_to_alias,
+                    duplicate_alias_visitor.alias_table.clone(),
+                ),
+            )),
+            ThirdPassRule::BrokenWikilink => Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
+                &all_files,
+                &config.filename_to_alias,
+                duplicate_alias_visitor.alias_table.clone(),
+            ))),
+        });
     }
-    let mut broken_wikilinks_visitor: BrokenWikilinkVisitor =
-        Rc::try_unwrap(broken_wikilinks_visitor)
-            .expect("visitors vector went out of scope")
-            .into_inner();
-    let mut unlinked_text_visitor: rules::unlinked_text::UnlinkedTextVisitor =
-        Rc::try_unwrap(unlinked_text_visitor)
-            .expect("visitors vector went out of scope")
-            .into_inner();
-    broken_wikilinks_visitor.finalize(&config.exclude)?;
-    unlinked_text_visitor.finalize(&config.exclude)?;
 
-    Ok(OutputReport::builder()
-        .similar_filenames(similar_filenames)
-        .duplicate_aliases(duplicate_alias_visitor.duplicate_alias_errors)
-        .broken_wikilinks(broken_wikilinks_visitor.broken_wikilinks)
-        .unlinked_texts(unlinked_text_visitor.unlinked_texts)
-        .build())
+    for file in &all_files {
+        parse(file, visitors.clone())?;
+    }
+
+    for visitor in visitors {
+        let mut visitor_cell = (*visitor).borrow_mut();
+        reports.extend(visitor_cell.finalize(&config.exclude)?);
+    }
+
+    Ok(OutputReport { reports })
 }

@@ -19,7 +19,7 @@ use super::ErrorCode;
 
 pub const CODE: &str = "name::similar";
 
-#[derive(Error, Debug, Diagnostic)]
+#[derive(Error, Debug, Diagnostic, Clone)]
 #[error("Filenames are similar")]
 #[diagnostic(code("name::similar"))]
 pub struct SimilarFilename {

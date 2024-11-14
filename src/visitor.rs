@@ -11,7 +11,7 @@ use comrak::{
 use log::{debug, trace};
 use thiserror::Error;
 
-use crate::rules::{duplicate_alias::NewDuplicateAliasError, ErrorCode};
+use crate::rules::{duplicate_alias::NewDuplicateAliasError, ErrorCode, Report};
 
 #[derive(Error, Debug)]
 pub enum VisitError {
@@ -58,7 +58,7 @@ pub trait Visitor {
     /// You have to run this yourself in lib, its not done in any of the funtions in this file for you
     /// WARNING: Don't overwrite this, its already written for you.
     /// Implement [`Self::_finalize`] instead
-    fn finalize(&mut self, exclude: &[ErrorCode]) -> Result<(), FinalizeError> {
+    fn finalize(&mut self, exclude: &[ErrorCode]) -> Result<Vec<Report>, FinalizeError> {
         trace!("{:?} finalizing", self.name());
         #[allow(clippy::used_underscore_items)]
         self._finalize(exclude)
@@ -68,7 +68,7 @@ pub trait Visitor {
 
     fn _finalize_file(&mut self, _source: &str, _path: &Path) -> Result<(), FinalizeError>;
 
-    fn _finalize(&mut self, _exclude: &[ErrorCode]) -> Result<(), FinalizeError>;
+    fn _finalize(&mut self, _exclude: &[ErrorCode]) -> Result<Vec<Report>, FinalizeError>;
 
     /// Get a unique name for the visitor
     fn name(&self) -> &str;

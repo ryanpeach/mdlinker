@@ -29,6 +29,8 @@ rayon = "1.10.0"
 regex = "1.10.6"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_yaml = "0.9.34"
+strum = "0.26.3"
+strum_macros = "0.26.4"
 thiserror = "1.0.63"
 toml = "0.8.19"
 walkdir = "2.5.0"
