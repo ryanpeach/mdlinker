@@ -10,6 +10,7 @@ pub mod visitor;
 use std::{backtrace::Backtrace, cell::RefCell, rc::Rc};
 
 use file::{get_files, name::ngrams};
+use log::info;
 use miette::{Diagnostic, Result};
 use ngrams::MissingSubstringError;
 use rules::{
@@ -132,10 +133,11 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         }
     }
 
-    let mut any_fixes = false;
-
     let mut output_report = check(config)?;
+    let mut counter = 0;
     loop {
+        info!("Fixing iteration {}", counter);
+        let mut any_fixes = false;
         for report in output_report.reports.clone() {
             if let Some(()) = match report {
                 Report::DuplicateAlias(report) => report.fix(config)?,
@@ -156,6 +158,7 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         }
 
         output_report = check(config)?;
+        counter += 1;
     }
 
     Ok(output_report)

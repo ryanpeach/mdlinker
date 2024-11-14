@@ -80,6 +80,7 @@ pub fn remove_frontmatter_from_source(source: &str, node: &Node<RefCell<Ast>>) -
         source.to_string()
     }
 }
+
 impl Visitor for FrontMatterVisitor {
     fn name(&self) -> &'static str {
         "FrontMatterVisitor"

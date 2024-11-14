@@ -21,9 +21,9 @@ use comrak::{
     arena_tree::Node,
     nodes::{Ast, NodeValue},
 };
+use fancy_regex::Regex;
 use hashbrown::HashMap;
 use miette::{Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
-use regex::Regex;
 use thiserror::Error;
 
 use super::{
@@ -122,33 +122,14 @@ impl Visitor for UnlinkedTextVisitor {
         let parent = node.parent();
         if let NodeValue::Text(text) = data {
             for alias in self.alias_table.keys() {
-                let re = Regex::new(&format!("(?i){alias}"))
-                    .expect("The regex is just case insensitive string search");
-                if let Some(found) = re.find(text) {
-                    // Make sure neither the character before or after is a letter
-                    // This makes sure you aren't matching a part of a word
-                    // This should also handle tags
-                    let found_char_index = found.start();
-                    if found_char_index > 0
-                        && !text
-                            .chars()
-                            .nth(found_char_index - 1)
-                            .expect("found is greater than 0")
-                            .is_whitespace()
-                    {
-                        continue;
-                    }
-                    let alias_len = alias.len();
-                    if found_char_index + alias_len < text.chars().count()
-                        && text
-                            .chars()
-                            .nth(found_char_index + alias_len)
-                            .expect("Already checked that found + alias.len() < text.len()")
-                            .is_alphabetic()
-                    {
-                        continue;
-                    }
+                // Make sure neither the character before or after is a letter
+                // This makes sure you aren't matching a part of a word
+                // This should also handle tags
+                // Check the character before the match
 
+                let re = Regex::new(&format!(r"(?i)(?<![\w#]){alias}(?!\w)"))
+                    .expect("The regex is just case insensitive string search");
+                if let Ok(Some(found)) = re.find(text) {
                     // Get our span
                     let span = repair_span_due_to_frontmatter(
                         SourceSpan::new(
@@ -158,9 +139,9 @@ impl Visitor for UnlinkedTextVisitor {
                                 sourcepos.start.column,
                             )
                             .offset()
-                                + found_char_index)
-                                .into(),
-                            alias.len(),
+                                + found.start())
+                            .into(),
+                            alias.to_string().len(),
                         ),
                         node,
                     );
