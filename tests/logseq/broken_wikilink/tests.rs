@@ -18,10 +18,10 @@ lazy_static! {
 fn number_of_broken_wikilinks() {
     info!("number_of_broken_wikilinks");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:?}");
     }
-    assert_eq!(report.broken_wikilinks.len(), 5);
+    assert_eq!(report.broken_wikilinks().len(), 5);
 }
 
 /// This passes because the link is valid
@@ -29,11 +29,11 @@ fn number_of_broken_wikilinks() {
 fn lorem_exist_and_is_wikilink() {
     info!("lorem_exist_and_is_wikilink");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:?}");
     }
     assert!(filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::2024_11_01::lorem", broken_wikilink::CODE).into()
     )
     .is_empty());
@@ -44,11 +44,11 @@ fn lorem_exist_and_is_wikilink() {
 fn ipsum_does_not_exist_and_is_wikilink() {
     info!("ipsum_does_not_exist_and_is_wikilink");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:?}");
     }
     assert!(!filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::2024_11_01::ipsum", broken_wikilink::CODE).into()
     )
     .is_empty());
@@ -59,11 +59,11 @@ fn ipsum_does_not_exist_and_is_wikilink() {
 fn dolor_does_not_exist_and_is_not_wikilink_in_journal() {
     info!("dolor_does_not_exist_and_is_not_wikilink_in_journal");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:#?}");
     }
     assert!(filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::2024_11_01::dolor", broken_wikilink::CODE).into()
     )
     .is_empty());
@@ -75,11 +75,11 @@ fn dolor_does_not_exist_and_is_not_wikilink_in_journal() {
 fn sit_exists_and_is_tag() {
     info!("sit_exists_and_is_tag");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:#?}");
     }
     assert!(filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::2024_11_01::sit", broken_wikilink::CODE).into()
     )
     .is_empty());
@@ -91,11 +91,11 @@ fn sit_exists_and_is_tag() {
 fn amet_does_not_exist_and_is_fancy_tag() {
     info!("amet_does_not_exist_and_is_fancy_tag");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:#?}");
     }
     assert!(!filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::2024_11_01::amet", broken_wikilink::CODE).into()
     )
     .is_empty());
@@ -107,11 +107,11 @@ fn amet_does_not_exist_and_is_fancy_tag() {
 fn consectetur_does_not_exist_and_is_tag() {
     info!("consectetur_does_not_exist_and_is_tag");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:#?}");
     }
     assert!(!filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::2024_11_01::consectetur", broken_wikilink::CODE).into()
     )
     .is_empty());
@@ -123,11 +123,11 @@ fn consectetur_does_not_exist_and_is_tag() {
 fn adipiscing_does_not_exist_and_is_tag() {
     info!("adipiscing_does_not_exist_and_is_tag");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:#?}");
     }
     assert!(!filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::2024_11_01::adipiscing", broken_wikilink::CODE).into()
     )
     .is_empty());
@@ -139,11 +139,11 @@ fn adipiscing_does_not_exist_and_is_tag() {
 fn elit_exists_and_is_tag() {
     info!("elit_exists_and_is_tag");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:#?}");
     }
     assert!(filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::2024_11_01::elit", broken_wikilink::CODE).into()
     )
     .is_empty());
@@ -153,11 +153,11 @@ fn elit_exists_and_is_tag() {
 fn dolor_does_not_exist_and_is_wikilink_in_foo() {
     info!("dolor_does_not_exist_and_is_not_wikilink_in_foo");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:#?}");
     }
     assert!(!filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::foo::dolor", broken_wikilink::CODE).into()
     )
     .is_empty());
@@ -167,11 +167,11 @@ fn dolor_does_not_exist_and_is_wikilink_in_foo() {
 fn dolor_does_not_exist_and_is_wikilink_in_foo_span() {
     info!("dolor_does_not_exist_and_is_not_wikilink_in_foo");
     let report = get_report(PATHS.as_slice());
-    for broken_wikilink in &report.broken_wikilinks {
+    for broken_wikilink in &report.broken_wikilinks() {
         debug!("{broken_wikilink:#?}");
     }
     let err_list = filter_code(
-        report.broken_wikilinks,
+        report.broken_wikilinks(),
         &format!("{}::foo::dolor", broken_wikilink::CODE).into(),
     );
     let err = err_list.iter().exactly_one().unwrap();

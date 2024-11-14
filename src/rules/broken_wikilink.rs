@@ -17,11 +17,11 @@ use hashbrown::HashMap;
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
 use thiserror::Error;
 
-use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId};
+use super::{dedupe_by_code, filter_by_excludes, ErrorCode, HasId, Report, ThirdPassReport};
 
 pub const CODE: &str = "content::wikilink::broken";
 
-#[derive(Error, Debug, Diagnostic, Builder)]
+#[derive(Error, Debug, Diagnostic, Builder, Clone)]
 #[error("A wikilink does not have a corresponding page")]
 #[diagnostic(code("content::wikilink::broken"))]
 pub struct BrokenWikilink {
@@ -112,13 +112,17 @@ impl Visitor for BrokenWikilinkVisitor {
         Ok(())
     }
 
-    fn _finalize(&mut self, excludes: &[ErrorCode]) -> Result<(), FinalizeError> {
+    fn _finalize(&mut self, excludes: &[ErrorCode]) -> Result<Vec<Report>, FinalizeError> {
         // We can "take" this because we are putting it right back
         self.broken_wikilinks = dedupe_by_code(filter_by_excludes(
             std::mem::take(&mut self.broken_wikilinks),
             excludes,
         ));
         self.wikilinks_visitor.finalize(excludes)?;
-        Ok(())
+        Ok(self
+            .broken_wikilinks
+            .iter()
+            .map(|x| Report::ThirdPass(ThirdPassReport::BrokenWikilink(x.clone())))
+            .collect())
     }
 }

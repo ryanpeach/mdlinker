@@ -8,6 +8,27 @@
 //!   Reports all implement [`crate::rules::HasId`].
 
 use derive_more::derive::{Constructor, From, Into};
+use strum_macros::{EnumDiscriminants, EnumIter};
+
+#[derive(Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumIter))]
+#[strum_discriminants(name(Rules))]
+pub enum Report {
+    SimilarFilename(similar_filename::SimilarFilename),
+    DuplicateAlias(duplicate_alias::DuplicateAlias),
+    ThirdPass(ThirdPassReport),
+}
+
+#[derive(Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumIter))]
+#[strum_discriminants(name(ThirdPassRule))]
+pub enum ThirdPassReport {
+    BrokenWikilink(crate::rules::broken_wikilink::BrokenWikilink),
+    UnlinkedText(crate::rules::unlinked_text::UnlinkedText),
+}
+
+/// A Reports error code, usually like `asdf::asdf::asdf`
+/// Uniquely identifies a violation of a rule, and can be deduped by Eq
 #[derive(Debug, Constructor, PartialEq, Eq, PartialOrd, Ord, Clone, From, Into)]
 pub struct ErrorCode(String);
 

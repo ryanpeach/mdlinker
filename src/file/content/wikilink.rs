@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     file::name::Filename,
+    rules::Report,
     sed::ReplacePair,
     visitor::{VisitError, Visitor},
 };
@@ -168,8 +169,8 @@ impl Visitor for WikilinkVisitor {
     fn _finalize(
         &mut self,
         _exclude: &[crate::rules::ErrorCode],
-    ) -> Result<(), crate::visitor::FinalizeError> {
+    ) -> Result<Vec<Report>, crate::visitor::FinalizeError> {
         self.wikilinks.clear();
-        Ok(())
+        Ok(vec![])
     }
 }

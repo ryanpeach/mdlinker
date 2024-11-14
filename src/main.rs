@@ -1,6 +1,8 @@
 use mdlinker::config;
 use mdlinker::lib;
-use miette::{miette, Report, Result};
+use mdlinker::rules::Report;
+use mdlinker::rules::ThirdPassReport;
+use miette::{miette, Result};
 
 /// Really just a wrapper that loads the config and passes it to the main library function
 fn main() -> Result<()> {
@@ -17,21 +19,25 @@ fn main() -> Result<()> {
         }
         Ok(e) => {
             println!();
-            for error in e.similar_filenames {
-                nb_errors += 1;
-                eprintln!("{:?}", Report::from(error));
-            }
-            for error in e.duplicate_aliases {
-                nb_errors += 1;
-                eprintln!("{:?}", Report::from(error));
-            }
-            for error in e.broken_wikilinks {
-                nb_errors += 1;
-                eprintln!("{:?}", Report::from(error));
-            }
-            for error in e.unlinked_texts {
-                nb_errors += 1;
-                eprintln!("{:?}", Report::from(error));
+            for report in e.reports {
+                match report {
+                    Report::SimilarFilename(e) => {
+                        nb_errors += 1;
+                        eprintln!("{e:?}");
+                    }
+                    Report::DuplicateAlias(e) => {
+                        nb_errors += 1;
+                        eprintln!("{e:?}");
+                    }
+                    Report::ThirdPass(ThirdPassReport::BrokenWikilink(e)) => {
+                        nb_errors += 1;
+                        eprintln!("{e:?}");
+                    }
+                    Report::ThirdPass(ThirdPassReport::UnlinkedText(e)) => {
+                        nb_errors += 1;
+                        eprintln!("{e:?}");
+                    }
+                }
             }
         }
     }
