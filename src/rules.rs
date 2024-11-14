@@ -9,6 +9,8 @@
 //!   `--fix`
 //!   Reports all implement [`crate::rules::HasId`].
 
+use std::backtrace::Backtrace;
+
 use derive_more::derive::{Constructor, From, Into};
 use glob::Pattern;
 use miette::Diagnostic;
@@ -93,11 +95,23 @@ impl<T: HasId + PartialOrd> VecHasIdExtensions<T> for Vec<T> {
 pub enum FixError {
     #[error("The git repo is dirty")]
     #[help("Please commit or stash your changes")]
-    DirtyRepo,
-    #[error(transparent)]
-    GitError(#[from] git2::Error),
-    #[error(transparent)]
-    IOError(#[from] std::io::Error),
+    DirtyRepo {
+        #[backtrace]
+        backtrace: Backtrace,
+    },
+    #[error("There was an error checking the git status: {source}")]
+    GitError {
+        source: git2::Error,
+        #[backtrace]
+        backtrace: Backtrace,
+    },
+    #[error("There was an IOError on file {file}: {source}")]
+    IOError {
+        source: std::io::Error,
+        #[backtrace]
+        backtrace: Backtrace,
+        file: String,
+    },
 }
 
 pub trait ReportTrait {

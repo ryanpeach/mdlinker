@@ -1,4 +1,5 @@
 use std::{
+    backtrace::Backtrace,
     cell::RefCell,
     path::{Path, PathBuf},
 };
@@ -51,7 +52,11 @@ impl ReportTrait for BrokenWikilink {
         let alias = wikilink.trim_start_matches("[[").trim_end_matches("]]");
         let filename = format!("{alias}.md");
         let path = config.pages_directory.join(filename);
-        std::fs::write(path, "")?;
+        std::fs::write(path.clone(), "").map_err(|source| FixError::IOError {
+            source,
+            backtrace: Backtrace::force_capture(),
+            file: path.to_string_lossy().to_string(),
+        })?;
         Ok(Some(()))
     }
 }

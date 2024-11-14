@@ -7,7 +7,7 @@ pub mod rules;
 pub mod sed;
 pub mod visitor;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{backtrace::Backtrace, cell::RefCell, rc::Rc};
 
 use file::{get_files, name::ngrams};
 use miette::Result;
@@ -112,15 +112,23 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         Ok(git) => match is_repo_dirty(&git) {
             Ok(is_dirty) => {
                 if !config.allow_dirty && is_dirty {
-                    return Err(OutputErrors::FixError(rules::FixError::DirtyRepo));
+                    return Err(OutputErrors::FixError(rules::FixError::DirtyRepo {
+                        backtrace: Backtrace::force_capture(),
+                    }));
                 }
             }
             Err(e) => {
-                return Err(OutputErrors::FixError(rules::FixError::GitError(e)));
+                return Err(OutputErrors::FixError(rules::FixError::GitError {
+                    source: e,
+                    backtrace: Backtrace::force_capture(),
+                }));
             }
         },
         Err(e) => {
-            return Err(OutputErrors::FixError(rules::FixError::GitError(e)));
+            return Err(OutputErrors::FixError(rules::FixError::GitError {
+                source: e,
+                backtrace: Backtrace::force_capture(),
+            }));
         }
     }
 

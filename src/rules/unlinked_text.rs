@@ -1,4 +1,5 @@
 use std::{
+    backtrace::Backtrace,
     cell::RefCell,
     path::{Path, PathBuf},
 };
@@ -58,7 +59,11 @@ impl ReportTrait for UnlinkedText {
         let end = start + self.span.len();
         source.insert_str(end, "]]");
         source.insert_str(start, "[[");
-        std::fs::write(self.src.name(), source)?;
+        std::fs::write(self.src.name(), source).map_err(|source| FixError::IOError {
+            source,
+            file: self.src.name().to_string(),
+            backtrace: Backtrace::force_capture(),
+        })?;
         Ok(Some(()))
     }
 }
@@ -121,19 +126,21 @@ impl Visitor for UnlinkedTextVisitor {
                     // Make sure neither the character before or after is a letter
                     // This makes sure you aren't matching a part of a word
                     // This should also handle tags
-                    if found > 0
+                    let found_char_index = text[..found].chars().count();
+                    if found_char_index > 0
                         && !text
                             .chars()
-                            .nth(found - 1)
+                            .nth(found_char_index - 1)
                             .expect("found is greater than 0")
                             .is_whitespace()
                     {
                         continue;
                     }
-                    if found + alias.to_string().len() < text.len()
+                    let alias_len = alias.len();
+                    if found_char_index + alias_len < text.chars().count()
                         && text
                             .chars()
-                            .nth(found + alias.to_string().len())
+                            .nth(found_char_index + alias_len)
                             .expect("Already checked that found + alias.len() < text.len()")
                             .is_alphabetic()
                     {
@@ -149,7 +156,7 @@ impl Visitor for UnlinkedTextVisitor {
                                 sourcepos.start.column,
                             )
                             .offset()
-                                + found)
+                                + found_char_index)
                                 .into(),
                             alias.to_string().len(),
                         ),
