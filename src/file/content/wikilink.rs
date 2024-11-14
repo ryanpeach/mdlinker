@@ -35,7 +35,7 @@ impl Alias {
     }
     #[must_use]
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.0.chars().count()
     }
 }
 
@@ -141,9 +141,9 @@ impl Visitor for WikilinkVisitor {
                                 SourceOffset::from_location(
                                     remove_frontmatter_from_source(source, node),
                                     sourcepos.start.line,
-                                    sourcepos.start.column,
+                                    sourcepos.start.column + 2,
                                 ),
-                                url.len() + 4,
+                                url.len(),
                             ),
                             node,
                         ))
