@@ -1,9 +1,3 @@
-use std::{
-    backtrace::Backtrace,
-    cell::RefCell,
-    path::{Path, PathBuf},
-};
-
 use crate::{
     config::Config,
     file::{
@@ -17,6 +11,7 @@ use crate::{
     visitor::{FinalizeError, VisitError, Visitor},
 };
 use bon::Builder;
+use cached::proc_macro::cached;
 use comrak::{
     arena_tree::Node,
     nodes::{Ast, NodeValue},
@@ -24,6 +19,11 @@ use comrak::{
 use fancy_regex::Regex;
 use hashbrown::HashMap;
 use miette::{Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
+use std::{
+    backtrace::Backtrace,
+    cell::RefCell,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 
 use super::{
@@ -110,6 +110,14 @@ impl UnlinkedTextVisitor {
         }
     }
 }
+
+#[cached]
+fn get_regex(alias: Alias) -> Regex {
+    // Compile the regex and cache it based on the alias
+    let pattern = format!(r"(?i)(?<![\w#]){alias}(?!\w)");
+    Regex::new(&pattern).expect("The regex is just case insensitive string search")
+}
+
 impl Visitor for UnlinkedTextVisitor {
     fn name(&self) -> &'static str {
         "UnlinkedTextVisitor"
@@ -127,8 +135,7 @@ impl Visitor for UnlinkedTextVisitor {
                 // This should also handle tags
                 // Check the character before the match
 
-                let re = Regex::new(&format!(r"(?i)(?<![\w#]){alias}(?!\w)"))
-                    .expect("The regex is just case insensitive string search");
+                let re = get_regex(alias.clone());
                 if let Ok(Some(found)) = re.find(text) {
                     // Get our span
                     let span = repair_span_due_to_frontmatter(
