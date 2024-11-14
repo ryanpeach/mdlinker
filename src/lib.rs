@@ -10,7 +10,7 @@ pub mod visitor;
 use std::{backtrace::Backtrace, cell::RefCell, rc::Rc};
 
 use file::{get_files, name::ngrams};
-use miette::Result;
+use miette::{Diagnostic, Result};
 use ngrams::MissingSubstringError;
 use rules::{
     broken_wikilink::BrokenWikilinkVisitor, duplicate_alias::DuplicateAliasVisitor,
@@ -76,7 +76,7 @@ impl OutputReport {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum OutputErrors {
     #[error(transparent)]
     RegexError(#[from] regex::Error),
