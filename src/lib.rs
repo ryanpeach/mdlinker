@@ -7,9 +7,10 @@ pub mod rules;
 pub mod sed;
 pub mod visitor;
 
-use std::{backtrace::Backtrace, cell::RefCell, rc::Rc};
+use std::{backtrace::Backtrace, cell::RefCell, env, rc::Rc};
 
 use file::{get_files, name::ngrams};
+use indicatif::ProgressBar;
 use log::info;
 use miette::{Diagnostic, Result};
 use ngrams::MissingSubstringError;
@@ -179,7 +180,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
 
     let mut reports: Vec<Report> = vec![];
 
-    // First pass
+    // Filename pass
     // Just over filenames
     // NOTE: Always use `filter_by_excludes` and `dedupe_by_code` on the reports
     let similar_filenames = SimilarFilename::calculate(
@@ -194,9 +195,16 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             .map(|x| Report::SimilarFilename(x.clone())),
     );
 
-    // Second pass
+    // First pass
     // This gives us metadata we need for all other rules from the content of files
     //  The duplicate alias visitor has to run first to get the table of aliases
+    let first_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
+        None
+    } else {
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_possible_truncation)]
+        Some(ProgressBar::new(all_files.len() as u64).with_prefix("First Pass"))
+    };
     let duplicate_alias_visitor = Rc::new(RefCell::new(DuplicateAliasVisitor::new(
         &all_files,
         &config.filename_to_alias,
@@ -204,14 +212,27 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     for file in &all_files {
         let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![duplicate_alias_visitor.clone()];
         parse(file, visitors)?;
+        if let Some(bar) = &first_pass_bar {
+            bar.inc(1);
+        }
     }
     let mut duplicate_alias_visitor: DuplicateAliasVisitor =
         Rc::try_unwrap(duplicate_alias_visitor)
             .expect("parse is done")
             .into_inner();
     reports.extend(duplicate_alias_visitor.finalize(&config.exclude)?);
+    if let Some(bar) = &first_pass_bar {
+        bar.finish();
+    }
 
-    // Third Pass
+    // Second Pass
+    let second_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
+        None
+    } else {
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_possible_truncation)]
+        Some(ProgressBar::new(all_files.len() as u64).with_prefix("Second Pass"))
+    };
     let mut visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![];
     for rule in ThirdPassRule::iter() {
         visitors.push(match rule {
@@ -232,11 +253,17 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
 
     for file in &all_files {
         parse(file, visitors.clone())?;
+        if let Some(bar) = &second_pass_bar {
+            bar.inc(1);
+        }
     }
 
     for visitor in visitors {
         let mut visitor_cell = (*visitor).borrow_mut();
         reports.extend(visitor_cell.finalize(&config.exclude)?);
+    }
+    if let Some(bar) = &second_pass_bar {
+        bar.finish();
     }
 
     Ok(OutputReport { reports })
