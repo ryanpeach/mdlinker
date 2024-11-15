@@ -141,9 +141,9 @@ impl Visitor for WikilinkVisitor {
                                 SourceOffset::from_location(
                                     remove_frontmatter_from_source(source, node),
                                     sourcepos.start.line,
-                                    sourcepos.start.column + 2,
+                                    sourcepos.start.column,
                                 ),
-                                url.len(),
+                                url.len() + 4,
                             ),
                             node,
                         ))

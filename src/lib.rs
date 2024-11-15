@@ -11,7 +11,6 @@ use std::{backtrace::Backtrace, cell::RefCell, env, rc::Rc};
 
 use file::{get_files, name::ngrams};
 use indicatif::ProgressBar;
-use log::info;
 use miette::{Diagnostic, Result};
 use ngrams::MissingSubstringError;
 use rules::{
@@ -135,31 +134,24 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     }
 
     let mut output_report = check(config)?;
-    let mut counter = 0;
-    loop {
-        info!("Fixing iteration {}", counter);
-        let mut any_fixes = false;
-        for report in output_report.reports.clone() {
-            if let Some(()) = match report {
-                Report::DuplicateAlias(report) => report.fix(config)?,
-                Report::SimilarFilename(report) => report.fix(config)?,
-                Report::ThirdPass(rules::ThirdPassReport::BrokenWikilink(report)) => {
-                    report.fix(config)?
-                }
-                Report::ThirdPass(rules::ThirdPassReport::UnlinkedText(report)) => {
-                    report.fix(config)?
-                }
-            } {
-                any_fixes = true;
+    let mut any_fixes = false;
+    for report in output_report.reports.clone() {
+        if let Some(()) = match report {
+            Report::DuplicateAlias(report) => report.fix(config)?,
+            Report::SimilarFilename(report) => report.fix(config)?,
+            Report::ThirdPass(rules::ThirdPassReport::BrokenWikilink(report)) => {
+                report.fix(config)?
             }
+            Report::ThirdPass(rules::ThirdPassReport::UnlinkedText(report)) => {
+                report.fix(config)?
+            }
+        } {
+            any_fixes = true;
         }
+    }
 
-        if !any_fixes {
-            break;
-        }
-
+    if any_fixes {
         output_report = check(config)?;
-        counter += 1;
     }
 
     Ok(output_report)

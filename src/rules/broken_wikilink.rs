@@ -16,6 +16,7 @@ use crate::{
 use bon::Builder;
 use comrak::{arena_tree::Node, nodes::Ast};
 use hashbrown::HashMap;
+use log::trace;
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
 use thiserror::Error;
 
@@ -33,6 +34,8 @@ pub struct BrokenWikilink {
     /// Used to identify the diagnostic and exclude it if needed
     id: ErrorCode,
 
+    alias: Alias,
+
     #[source_code]
     src: NamedSource<String>,
 
@@ -46,12 +49,13 @@ pub struct BrokenWikilink {
 impl ReportTrait for BrokenWikilink {
     /// Create a new file called the text under the span
     fn fix(&self, config: &Config) -> Result<Option<()>, FixError> {
-        let source = self.src.inner();
-        let wikilink = source[self.wikilink.offset()..self.wikilink.offset() + self.wikilink.len()]
-            .to_string();
-        let alias = Alias::new(wikilink.trim_start_matches("[[").trim_end_matches("]]"));
-        let filename = FilenameLowercase::from_alias(&alias, config);
-        let path = config.pages_directory.join(filename.to_string());
+        trace!(
+            "Fixing BrokenWikilink {} in {}",
+            self.alias,
+            self.src.name()
+        );
+        let filename = format!("{}.md", FilenameLowercase::from_alias(&self.alias, config));
+        let path = config.pages_directory.join(filename);
         std::fs::write(path.clone(), "").map_err(|source| FixError::IOError {
             source,
             backtrace: Backtrace::force_capture(),
@@ -127,6 +131,7 @@ impl Visitor for BrokenWikilinkVisitor {
                         .advice(format!(
                             "Create a page or alias on an existing page for '{alias}' (case insensitive), or fix the wikilinks spelling"
                         ))
+                        .alias(alias)
                         .build(),
                 );
             }
