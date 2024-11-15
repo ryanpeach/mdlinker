@@ -17,6 +17,7 @@ use comrak::{
     nodes::{Ast, NodeValue},
 };
 use hashbrown::HashMap;
+use log::trace;
 use miette::{Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
 use std::{
     backtrace::Backtrace,
@@ -53,15 +54,22 @@ pub struct UnlinkedText {
 
 impl ReportTrait for UnlinkedText {
     /// Open the file, surround the span in [[ ]], then save it
+    /// TODO: Be able to handle this in parallel with other reports
     fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
+        let file = self.src.name().to_owned();
+        trace!("Fixing unlinked text: {:?}", file);
         let mut source = self.src.inner().clone();
         let start = self.span.offset();
         let end = start + self.span.len();
-        source.insert_str(end, "]]");
+        if end >= source.len() {
+            source.push_str("]]"); // Append to the end if `end` is out of bounds
+        } else {
+            source.insert_str(end, "]]"); // Insert at `end` if within bounds
+        }
         source.insert_str(start, "[[");
         std::fs::write(self.src.name(), source).map_err(|source| FixError::IOError {
             source,
-            file: self.src.name().to_owned(),
+            file,
             backtrace: Backtrace::force_capture(),
         })?;
         Ok(Some(()))
@@ -123,7 +131,7 @@ fn is_start_boundary(text: &str, start: usize) -> bool {
         text[..start]
             .chars()
             .next_back()
-            .map_or(true, |c| !c.is_alphanumeric())
+            .map_or(true, char::is_whitespace)
     }
 }
 
@@ -144,10 +152,7 @@ fn is_end_boundary(text: &str, end: usize) -> bool {
     if end == text.len() {
         true
     } else {
-        text[end..]
-            .chars()
-            .next()
-            .map_or(true, |c| !c.is_alphanumeric())
+        text[end..].chars().next().map_or(true, char::is_whitespace)
     }
 }
 

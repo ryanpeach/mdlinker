@@ -22,19 +22,19 @@ fn main() -> Result<()> {
                 match report {
                     MdReport::SimilarFilename(e) => {
                         nb_errors += 1;
-                        eprintln!("{e:?}");
+                        eprintln!("{:?}", Report::from(e));
                     }
                     MdReport::DuplicateAlias(e) => {
                         nb_errors += 1;
-                        eprintln!("{e:?}");
+                        eprintln!("{:?}", Report::from(e));
                     }
                     MdReport::ThirdPass(ThirdPassReport::BrokenWikilink(e)) => {
                         nb_errors += 1;
-                        eprintln!("{e:?}");
+                        eprintln!("{:?}", Report::from(e));
                     }
                     MdReport::ThirdPass(ThirdPassReport::UnlinkedText(e)) => {
                         nb_errors += 1;
-                        eprintln!("{e:?}");
+                        eprintln!("{:?}", Report::from(e));
                     }
                 }
             }
