@@ -140,10 +140,7 @@ fn is_start_hashtag(text: &str, start: usize) -> bool {
     if start == 0 {
         false
     } else {
-        text[..start]
-            .chars()
-            .next_back()
-            .map_or(false, |c| c == '#')
+        text[..start].ends_with('#')
     }
 }
 
