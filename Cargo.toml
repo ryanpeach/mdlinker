@@ -51,10 +51,6 @@ name = "logseq"
 [profile.bench]
 debug = true
 
-[toolchain]
-channel = "nightly"
-components = ["clippy"]
-
 # [lints.rust]
 # missing_docs = "deny"
 
