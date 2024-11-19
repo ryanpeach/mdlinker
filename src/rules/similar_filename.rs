@@ -158,8 +158,8 @@ impl SimilarFilename {
         };
         let matcher = SkimMatcherV2::default();
         let mut matches: Vec<SimilarFilename> = Vec::new();
-        for (i, (ngram, filepath)) in file_ngrams.clone().iter().enumerate() {
-            for (other_ngram, other_filepath) in file_ngrams.iter() {
+        for (ngram, filepath) in file_ngrams {
+            for (other_ngram, other_filepath) in file_ngrams {
                 if ngram.nb_words() != other_ngram.nb_words() {
                     continue;
                 }
