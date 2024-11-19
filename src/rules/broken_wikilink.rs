@@ -122,15 +122,16 @@ impl Visitor for BrokenWikilinkVisitor {
         let wikilinks = self.wikilinks_visitor.wikilinks.clone();
         for wikilink in wikilinks {
             let alias = wikilink.alias;
+            let id = format!("{CODE}::{filename}::{alias}");
             if !self.alias_table.contains_key(&alias) {
                 self.broken_wikilinks.push(
                     BrokenWikilink::builder()
-                        .id(format!("{CODE}::{filename}::{alias}").into())
+                        .advice(format!(
+                            "Create a page or alias on an existing page for '{alias}' (case insensitive), or fix the wikilinks spelling.\nid: {id:?}"
+                        ))
+                        .id(id.into())
                         .src(NamedSource::new(path.to_string_lossy(), source.to_string()))
                         .wikilink(wikilink.span)
-                        .advice(format!(
-                            "Create a page or alias on an existing page for '{alias}' (case insensitive), or fix the wikilinks spelling"
-                        ))
                         .alias(alias)
                         .build(),
                 );
