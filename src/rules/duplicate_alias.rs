@@ -62,6 +62,10 @@ pub enum DuplicateAlias {
         /// Put an exact copy but using the other file in src
         #[related]
         other: Vec<Self>,
+
+        /// Just some advice
+        #[help]
+        advice: String,
     },
 }
 impl ReportTrait for DuplicateAlias {
@@ -301,11 +305,13 @@ impl DuplicateAlias {
             );
 
             Ok(DuplicateAlias::FileContentContentDuplicate {
+                advice: format!("id: {id:?}"),
                 id: id.clone().into(),
                 other_filename: get_filename(file2_path),
                 src: NamedSource::new(file1_path.to_string_lossy(), file1_content.to_string()),
                 alias: file1_content_span,
                 other: vec![DuplicateAlias::FileContentContentDuplicate {
+                    advice: format!("id: {id:?}"),
                     id: id.into(),
                     other_filename: get_filename(file1_path),
                     src: NamedSource::new(file2_path.to_string_lossy(), file2_content.to_string()),

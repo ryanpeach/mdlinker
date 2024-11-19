@@ -216,15 +216,16 @@ impl Visitor for UnlinkedTextVisitor {
     ) -> std::result::Result<(), FinalizeError> {
         for (alias, span) in &mut self.new_unlinked_texts {
             let filename = get_filename(path);
+            let id = format!("{CODE}::{filename}::{alias}");
             self.unlinked_texts.push(
                 UnlinkedText::builder()
-                    .id(ErrorCode::new(format!("{CODE}::{filename}::{alias}")))
+                    .advice(format!(
+                        "Consider wrapping it in a wikilink, like: [[{alias}]]\nNOTE: If running in --fix, you may need to run fix more than once to fix all unlinked text errors.\n      I recommend doing this one at a time.\nREF: https://github.com/ryanpeach/mdlinker/issues/44\nid: {id:?}"
+                    ))
+                    .id(id.into())
                     .src(NamedSource::new(path.to_string_lossy(), source.to_string()))
                     .alias(alias.clone())
                     .span(*span)
-                    .advice(format!(
-                        "Consider wrapping it in a wikilink, like: [[{alias}]]\nNOTE: If running in --fix, you may need to run fix more than once to fix all unlinked text errors.\n      I recommend doing this one at a time.\nREF: https://github.com/ryanpeach/mdlinker/issues/44"
-                    ))
                     .build(),
             );
         }
