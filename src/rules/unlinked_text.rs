@@ -131,7 +131,7 @@ fn is_start_boundary(text: &str, start: usize) -> bool {
         text[..start]
             .chars()
             .next_back()
-            .map_or(true, char::is_whitespace)
+            .is_none_or(char::is_whitespace)
     }
 }
 
@@ -149,7 +149,7 @@ fn is_end_boundary(text: &str, end: usize) -> bool {
     if end == text.len() {
         true
     } else {
-        text[end..].chars().next().map_or(true, char::is_whitespace)
+        text[end..].chars().next().is_none_or(char::is_whitespace)
     }
 }
 
