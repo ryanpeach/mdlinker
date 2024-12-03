@@ -9,6 +9,7 @@ use comrak::{
     arena_tree::Node, nodes::Ast, parse_document, Arena, ExtensionOptionsBuilder, Options,
 };
 use log::{debug, trace};
+use std::backtrace;
 use thiserror::Error;
 
 use crate::rules::{duplicate_alias::NewDuplicateAliasError, ErrorCode, Report};
@@ -18,24 +19,26 @@ pub enum VisitError {
     #[error("Error deserializing the node")]
     FrontMatterDeserializeError {
         #[from]
-        source: serde_yaml::Error,
         #[backtrace]
-        backtrace: std::backtrace::Backtrace,
+        source: serde_yaml::Error,
     },
 
     #[error("Error making patterns from aliases")]
     AhoBuildError {
         #[from]
-        source: aho_corasick::BuildError,
         #[backtrace]
-        backtrace: std::backtrace::Backtrace,
+        source: aho_corasick::BuildError,
     },
 }
 
 #[derive(Error, Debug)]
 pub enum FinalizeError {
     #[error(transparent)]
-    NewDuplicateAliasError(#[from] NewDuplicateAliasError),
+    NewDuplicateAliasError {
+        #[from]
+        #[backtrace]
+        source: NewDuplicateAliasError,
+    },
 }
 
 /// A trait for implementing an AST visitor pattern
@@ -84,21 +87,38 @@ pub trait Visitor {
 
 #[derive(Error, Debug)]
 pub enum ParseError {
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-    #[error("Error parsing the source code using tree-sitter")]
-    TreeSitter,
-    #[error(transparent)]
-    FinalizeError(#[from] FinalizeError),
-    #[error(transparent)]
-    VisitError(#[from] VisitError),
+    #[error("Error reading the file {file:?}")]
+    IoError {
+        file: PathBuf,
+        #[backtrace]
+        source: std::io::Error,
+    },
+    #[error("Error parsing the source code for file {file:?} using tree-sitter")]
+    TreeSitter {
+        file: PathBuf,
+        backtrace: backtrace::Backtrace,
+    },
+    #[error("Error finalizing the file {file:?}")]
+    FinalizeError {
+        file: PathBuf,
+        #[backtrace]
+        source: FinalizeError,
+    },
+    #[error("Error visiting the file {file:?}")]
+    VisitError {
+        file: PathBuf,
+        #[backtrace]
+        source: VisitError,
+    },
 }
 
 /// Parse the source code and visit all the nodes using tree-sitter
 pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<(), ParseError> {
     debug!("Parsing file {:?}", path);
-    let source = std::fs::read_to_string(path)?;
-
+    let source = std::fs::read_to_string(path).map_err(|source| ParseError::IoError {
+        file: path.clone(),
+        source,
+    })?;
     // Parse the source code
     let arena = Arena::new();
     let options = ExtensionOptionsBuilder::default()
@@ -118,20 +138,35 @@ pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<
     // Visit the root
     for visitor in visitors.clone() {
         let mut visitor_cell = (*visitor).borrow_mut();
-        visitor_cell.visit(root, &source)?;
+        visitor_cell
+            .visit(root, &source)
+            .map_err(|source| ParseError::VisitError {
+                file: path.clone(),
+                source,
+            })?;
     }
 
     // Pass the node to all the visitors
     for node in root.descendants() {
         for visitor in visitors.clone() {
             let mut visitor_cell = (*visitor).borrow_mut();
-            visitor_cell.visit(node, &source)?;
+            visitor_cell
+                .visit(node, &source)
+                .map_err(|source| ParseError::VisitError {
+                    file: path.clone(),
+                    source,
+                })?;
         }
     }
 
     for visitor in visitors {
         let mut visitor_cell = (*visitor).borrow_mut();
-        visitor_cell.finalize_file(&source, path)?;
+        visitor_cell
+            .finalize_file(&source, path)
+            .map_err(|source| ParseError::FinalizeError {
+                file: path.clone(),
+                source,
+            })?;
     }
 
     // The visitors are modified in place, no need to return anything
