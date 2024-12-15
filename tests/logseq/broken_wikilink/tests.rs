@@ -175,6 +175,6 @@ fn dolor_does_not_exist_and_is_wikilink_in_foo_span() {
         &format!("{}::foo::dolor", broken_wikilink::CODE).into(),
     );
     let err = err_list.iter().exactly_one().unwrap();
-    assert_eq!(err.wikilink.offset(), 62);
-    assert_eq!(err.wikilink.len(), 5);
+    assert_eq!(err.wikilink.offset(), 127);
+    assert_eq!(err.wikilink.len(), 6);
 }
