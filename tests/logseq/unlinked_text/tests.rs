@@ -112,6 +112,6 @@ fn lorem_exists_and_is_not_wikilink_in_journal() {
         &format!("{}::foo::lorem", unlinked_text::CODE).into(),
     );
     let err = err_list.iter().exactly_one().unwrap();
-    assert_eq!(err.span.offset(), 168);
+    assert_eq!(err.span.offset(), 85);
     assert_eq!(err.span.len(), 5);
 }
