@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+import sys
+import argparse
+import re
+
+def process_file(file_path, char_map=None):
+    """Process a file to find or replace non-ASCII characters."""
+    non_ascii_chars = set()
+    output_lines = []
+    fixed = False
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            for line in file:
+                non_ascii_chars.update(c for c in line if ord(c) > 127)
+                if char_map:
+                    fixed_line = ''.join(char_map.get(c, c) for c in line)
+                    output_lines.append(fixed_line)
+                    fixed = fixed or fixed_line != line
+                else:
+                    output_lines.append(line)
+
+        if char_map and output_lines and fixed:
+            with open(file_path, 'w', encoding='utf-8') as file:
+                file.writelines(output_lines)
+            print(f"Fixed non-ASCII characters in: {file_path}")
+        return non_ascii_chars
+
+    except UnicodeDecodeError as e:
+        print(f"Error reading {file_path}: {e}", file=sys.stderr)
+    except FileNotFoundError:
+        print(f"File not found: {file_path}", file=sys.stderr)
+    return non_ascii_chars
+
+def parse_custom_replacements(replacement_list):
+    """Parse custom replacements provided via command line arguments."""
+    char_map = {}
+    for item in replacement_list:
+        if len(item) >= 2 and ':' in item:
+            key, value = item.split(':', 1)
+            if key and value:
+                char_map[key] = value
+    return char_map
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Find and optionally fix non-ASCII characters in files."
+                    "\nExamples:"
+                    "\n  - Find all non-ASCII characters in a file:"
+                    "\n    python3 script.py file.txt"
+                    "\n  - Replace non-ASCII characters using predefined mappings:"
+                    "\n    python3 script.py --fix file.txt"
+                    "\n  - Add custom replacements (e.g., replace ‘ with ' and … with ...):"
+                    "\n    python3 script.py --fix --replacements '‘:\"' '…:...' file.txt"
+                    "\n  - Process multiple files with `find` and `xargs`:"
+                    "\n    find . -type f -name \"*.txt\" | xargs python3 script.py --fix",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument('--fix', action='store_true', help="Replace non-ASCII characters based on a predefined or custom map")
+    parser.add_argument('-r', '--replacements', nargs='*', default=[], help="Custom replacements in the format char:replacement")
+    parser.add_argument('files', nargs='*', help="Files to process. Use with find | xargs.")
+    args = parser.parse_args()
+
+    # Define default replacement map for non-ASCII characters
+    char_map = {
+        '‘': "'",  # Left single quotation mark
+        '’': "'",  # Right single quotation mark
+        '“': '"',  # Left double quotation mark
+        '”': '"',  # Right double quotation mark
+        '…': '...', # Ellipsis
+        '–': '-',  # En-dash
+        '—': '--', # Em-dash
+        ' ': ' ',  # Non-breaking space
+    }
+
+    # Add custom replacements to the map
+    custom_map = parse_custom_replacements(args.replacements)
+    char_map.update(custom_map)
+
+    # Process each file passed through stdin (xargs-compatible)
+    if not sys.stdin.isatty():  # If stdin is not empty
+        files = [line.strip() for line in sys.stdin]
+    else:
+        files = args.files
+
+    if not files:
+        print("No files specified or provided via stdin.", file=sys.stderr)
+        return
+
+    for file_path in files:
+        non_ascii_chars = process_file(file_path, char_map if args.fix else None)
+        if non_ascii_chars:
+            print(f"Non-ASCII characters found in {file_path}: {''.join(non_ascii_chars)}")
+
+if __name__ == "__main__":
+    main()

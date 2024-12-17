@@ -1,10 +1,7 @@
 use crate::{
     config::Config,
     file::{
-        content::{
-            front_matter::{remove_frontmatter_from_source, repair_span_due_to_frontmatter},
-            wikilink::{Alias, WikilinkVisitor},
-        },
+        content::wikilink::{Alias, WikilinkVisitor},
         name::{get_filename, Filename},
     },
     sed::ReplacePair,
@@ -14,7 +11,7 @@ use aho_corasick::AhoCorasick;
 use bon::Builder;
 use comrak::{
     arena_tree::Node,
-    nodes::{Ast, NodeValue},
+    nodes::{Ast, NodeValue, Sourcepos},
 };
 use hashbrown::HashMap;
 use log::trace;
@@ -58,7 +55,11 @@ impl ReportTrait for UnlinkedText {
     fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
         let file = self.src.name().to_owned();
         trace!("Fixing unlinked text: {:?}", file);
-        let mut source = self.src.inner().clone();
+        let mut source = std::fs::read_to_string(&file).map_err(|src| FixError::IOError {
+            source: src,
+            file: file.clone(),
+            backtrace: Backtrace::force_capture(),
+        })?;
         let start = self.span.offset();
         let end = start + self.span.len();
         if end >= source.len() {
@@ -97,7 +98,7 @@ impl HasId for UnlinkedText {
 #[derive(Debug)]
 pub struct UnlinkedTextVisitor {
     pub alias_table: HashMap<Alias, PathBuf>,
-    new_unlinked_texts: Vec<(Alias, SourceSpan)>,
+    new_unlinked_texts: Vec<(Alias, SourceSpan, Sourcepos)>,
     wikilink_visitor: WikilinkVisitor,
     pub unlinked_texts: Vec<UnlinkedText>,
 }
@@ -181,12 +182,8 @@ impl Visitor for UnlinkedTextVisitor {
                     continue;
                 }
                 let alias = Alias::new(&patterns[found.pattern().as_usize()]);
-                if "lorem" == alias.to_string() {
-                    println!("Found lorem");
-                }
-                let text_without_frontmatter = remove_frontmatter_from_source(source, node);
                 let sourcepos_start_offset_bytes = SourceOffset::from_location(
-                    text_without_frontmatter,
+                    source,
                     sourcepos.start.line,
                     sourcepos.start.column,
                 )
@@ -194,7 +191,6 @@ impl Visitor for UnlinkedTextVisitor {
                 let byte_length = found.end() - found.start();
                 let offset_bytes = sourcepos_start_offset_bytes + found.start();
                 let span = SourceSpan::new(offset_bytes.into(), byte_length);
-                let span_repaired = repair_span_due_to_frontmatter(span, node);
 
                 // Dont match inside wikilinks
                 if let Some(parent) = parent {
@@ -204,7 +200,7 @@ impl Visitor for UnlinkedTextVisitor {
                     }
                 }
 
-                self.new_unlinked_texts.push((alias, span_repaired));
+                self.new_unlinked_texts.push((alias, span, sourcepos));
             }
         }
         Ok(())
@@ -214,9 +210,11 @@ impl Visitor for UnlinkedTextVisitor {
         source: &str,
         path: &Path,
     ) -> std::result::Result<(), FinalizeError> {
-        for (alias, span) in &mut self.new_unlinked_texts {
+        for (alias, span, sourcepos) in &mut self.new_unlinked_texts {
             let filename = get_filename(path);
-            let id = format!("{CODE}::{filename}::{alias}");
+            let linenum = sourcepos.start.line;
+            let colnum = sourcepos.start.column;
+            let id = format!("{CODE}::{filename}::{alias}::{linenum}::{colnum}");
             self.unlinked_texts.push(
                 UnlinkedText::builder()
                     .advice(format!(
@@ -240,6 +238,8 @@ impl Visitor for UnlinkedTextVisitor {
             std::mem::take(&mut self.unlinked_texts),
             excludes,
         ));
+        self.unlinked_texts.sort_by_key(|item| item.span.offset());
+        self.unlinked_texts.reverse();
         self.wikilink_visitor.finalize(excludes)?;
         Ok(self
             .unlinked_texts

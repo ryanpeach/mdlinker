@@ -13,7 +13,19 @@ Uses git [pre-commit](https://pre-commit.com/) to integrate with your git workfl
     - id: mdlinker
 ```
 
-> **_NOTE:_** Linking works best when you spell things correctly, in both your filenames and file contents. Consider pairing this tool with a spell checker.
+Linking works best when you spell things correctly, in both your filenames and file contents. Also this tool only works with ASCII characters at the moment (see https://github.com/ryanpeach/mdlinker/issues/45). I recommend adding the following pre-commit hooks before this one:
+
+```yaml
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.23.7
+    hooks:
+      - id: typos
+  - repo: https://github.com/ryanpeach/mdlinker
+    rev: <VERSION>
+    hooks:
+      - id: enforce-ascii
+      - id: mdlinker
+```
 
 # Configuration
 

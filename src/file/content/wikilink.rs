@@ -17,8 +17,6 @@ use comrak::{
 use miette::{SourceOffset, SourceSpan};
 use regex::Regex;
 
-use super::front_matter::{remove_frontmatter_from_source, repair_span_due_to_frontmatter};
-
 /// A linkable string, like that in a wikilink, or its corresponding filename
 /// Aliases are always lowercase
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -108,9 +106,8 @@ impl Visitor for WikilinkVisitor {
                     .get(1)
                     .expect("The regex has 2 capture groups")
                     .start();
-                let text_without_frontmatter = remove_frontmatter_from_source(source, node);
                 let sourcepos_start_offset_bytes = SourceOffset::from_location(
-                    text_without_frontmatter,
+                    source,
                     sourcepos.start.line,
                     sourcepos.start.column,
                 )
@@ -119,13 +116,8 @@ impl Visitor for WikilinkVisitor {
                     (sourcepos_start_offset_bytes + capture_start_byte).into(),
                     alias.char_len(),
                 );
-                let span_repaired = repair_span_due_to_frontmatter(span, node);
-                self.wikilinks.push(
-                    Wikilink::builder()
-                        .alias(alias.clone())
-                        .span(span_repaired)
-                        .build(),
-                );
+                self.wikilinks
+                    .push(Wikilink::builder().alias(alias.clone()).span(span).build());
             }
         };
         match data {
@@ -136,16 +128,13 @@ impl Visitor for WikilinkVisitor {
                 self.wikilinks.push(
                     Wikilink::builder()
                         .alias(Alias::new(url))
-                        .span(repair_span_due_to_frontmatter(
-                            SourceSpan::new(
-                                SourceOffset::from_location(
-                                    remove_frontmatter_from_source(source, node),
-                                    sourcepos.start.line,
-                                    sourcepos.start.column,
-                                ),
-                                url.len() + 4,
+                        .span(SourceSpan::new(
+                            SourceOffset::from_location(
+                                source,
+                                sourcepos.start.line,
+                                sourcepos.start.column,
                             ),
-                            node,
+                            url.len() + 4,
                         ))
                         .build(),
                 );
