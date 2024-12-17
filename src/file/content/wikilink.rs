@@ -106,9 +106,12 @@ impl Visitor for WikilinkVisitor {
                     .get(1)
                     .expect("The regex has 2 capture groups")
                     .start();
-                let sourcepos_start_offset_bytes =
-                    SourceOffset::from_location(text, sourcepos.start.line, sourcepos.start.column)
-                        .offset();
+                let sourcepos_start_offset_bytes = SourceOffset::from_location(
+                    source,
+                    sourcepos.start.line,
+                    sourcepos.start.column,
+                )
+                .offset();
                 let span = SourceSpan::new(
                     (sourcepos_start_offset_bytes + capture_start_byte).into(),
                     alias.char_len(),
