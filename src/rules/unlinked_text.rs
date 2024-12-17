@@ -1,10 +1,7 @@
 use crate::{
     config::Config,
     file::{
-        content::{
-            front_matter::{remove_frontmatter_from_source, repair_span_due_to_frontmatter},
-            wikilink::{Alias, WikilinkVisitor},
-        },
+        content::wikilink::{Alias, WikilinkVisitor},
         name::{get_filename, Filename},
     },
     sed::ReplacePair,
@@ -188,17 +185,12 @@ impl Visitor for UnlinkedTextVisitor {
                 if "lorem" == alias.to_string() {
                     println!("Found lorem");
                 }
-                let text_without_frontmatter = remove_frontmatter_from_source(source, node);
-                let sourcepos_start_offset_bytes = SourceOffset::from_location(
-                    text_without_frontmatter,
-                    sourcepos.start.line,
-                    sourcepos.start.column,
-                )
-                .offset();
+                let sourcepos_start_offset_bytes =
+                    SourceOffset::from_location(text, sourcepos.start.line, sourcepos.start.column)
+                        .offset();
                 let byte_length = found.end() - found.start();
                 let offset_bytes = sourcepos_start_offset_bytes + found.start();
                 let span = SourceSpan::new(offset_bytes.into(), byte_length);
-                let span_repaired = repair_span_due_to_frontmatter(span, node);
 
                 // Dont match inside wikilinks
                 if let Some(parent) = parent {
@@ -209,7 +201,7 @@ impl Visitor for UnlinkedTextVisitor {
                 }
 
                 self.new_unlinked_texts
-                    .push((alias, span_repaired, sourcepos));
+                    .push((alias, span, sourcepos));
             }
         }
         Ok(())

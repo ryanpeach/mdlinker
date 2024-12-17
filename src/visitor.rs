@@ -5,9 +5,7 @@ use std::{
     rc::Rc,
 };
 
-use comrak::{
-    arena_tree::Node, nodes::Ast, parse_document, Arena, ExtensionOptionsBuilder, Options,
-};
+use comrak::{arena_tree::Node, nodes::Ast, parse_document, Arena, ExtensionOptions, Options};
 use log::{debug, trace};
 use std::backtrace;
 use thiserror::Error;
@@ -135,11 +133,10 @@ pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<
 
     // Parse the source code
     let arena = Arena::new();
-    let options = ExtensionOptionsBuilder::default()
-        .front_matter_delimiter(Some("---".to_string()))
+    let options = ExtensionOptions::builder()
+        .front_matter_delimiter("---".to_string())
         .wikilinks_title_before_pipe(true)
-        .build()
-        .expect("Constant");
+        .build();
     let root = parse_document(
         &arena,
         &source,
