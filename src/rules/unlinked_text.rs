@@ -181,6 +181,9 @@ impl Visitor for UnlinkedTextVisitor {
                     continue;
                 }
                 let alias = Alias::new(&patterns[found.pattern().as_usize()]);
+                if "lorem" == alias.to_string() {
+                    println!("Found lorem");
+                }
                 let text_without_frontmatter = remove_frontmatter_from_source(source, node);
                 let sourcepos_start_offset_bytes = SourceOffset::from_location(
                     text_without_frontmatter,
