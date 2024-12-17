@@ -182,9 +182,12 @@ impl Visitor for UnlinkedTextVisitor {
                     continue;
                 }
                 let alias = Alias::new(&patterns[found.pattern().as_usize()]);
-                let sourcepos_start_offset_bytes =
-                    SourceOffset::from_location(text, sourcepos.start.line, sourcepos.start.column)
-                        .offset();
+                let sourcepos_start_offset_bytes = SourceOffset::from_location(
+                    source,
+                    sourcepos.start.line,
+                    sourcepos.start.column,
+                )
+                .offset();
                 let byte_length = found.end() - found.start();
                 let offset_bytes = sourcepos_start_offset_bytes + found.start();
                 let span = SourceSpan::new(offset_bytes.into(), byte_length);
