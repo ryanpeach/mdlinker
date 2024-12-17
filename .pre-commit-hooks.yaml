@@ -4,3 +4,9 @@
     entry: mdlinker
     language: rust
     pass_filenames: false
+-   id: enforce-ascii
+    name: Enforce ASCII
+    description: This hook replaces all non-ascii characters with ascii characters
+    entry: bin/enforce-ascii
+    language: python
+    pass_filenames: true
