@@ -182,9 +182,6 @@ impl Visitor for UnlinkedTextVisitor {
                     continue;
                 }
                 let alias = Alias::new(&patterns[found.pattern().as_usize()]);
-                if "lorem" == alias.to_string() {
-                    println!("Found lorem");
-                }
                 let sourcepos_start_offset_bytes =
                     SourceOffset::from_location(text, sourcepos.start.line, sourcepos.start.column)
                         .offset();
@@ -200,8 +197,7 @@ impl Visitor for UnlinkedTextVisitor {
                     }
                 }
 
-                self.new_unlinked_texts
-                    .push((alias, span, sourcepos));
+                self.new_unlinked_texts.push((alias, span, sourcepos));
             }
         }
         Ok(())
