@@ -20,12 +20,11 @@ Linking works best when you spell things correctly, in both your filenames and f
     rev: v1.23.7
     hooks:
       - id: typos
-  - repo: https://github.com/sirosen/texthooks
-    rev: 0.6.8
+  - repo: https://github.com/ryanpeach/mdlinker
+    rev: <VERSION>
     hooks:
-      - id: fix-smartquotes
-      - id: fix-ligatures
-      - id: fix-spaces
+      - id: enforce-ascii
+      - id: mdlinker
 ```
 
 # Configuration
