@@ -14,7 +14,7 @@ use aho_corasick::AhoCorasick;
 use bon::Builder;
 use comrak::{
     arena_tree::Node,
-    nodes::{Ast, NodeValue},
+    nodes::{Ast, NodeValue, Sourcepos},
 };
 use hashbrown::HashMap;
 use log::trace;
@@ -101,7 +101,7 @@ impl HasId for UnlinkedText {
 #[derive(Debug)]
 pub struct UnlinkedTextVisitor {
     pub alias_table: HashMap<Alias, PathBuf>,
-    new_unlinked_texts: Vec<(Alias, SourceSpan)>,
+    new_unlinked_texts: Vec<(Alias, SourceSpan, Sourcepos)>,
     wikilink_visitor: WikilinkVisitor,
     pub unlinked_texts: Vec<UnlinkedText>,
 }
@@ -208,7 +208,8 @@ impl Visitor for UnlinkedTextVisitor {
                     }
                 }
 
-                self.new_unlinked_texts.push((alias, span_repaired));
+                self.new_unlinked_texts
+                    .push((alias, span_repaired, sourcepos));
             }
         }
         Ok(())
@@ -218,9 +219,11 @@ impl Visitor for UnlinkedTextVisitor {
         source: &str,
         path: &Path,
     ) -> std::result::Result<(), FinalizeError> {
-        for (alias, span) in &mut self.new_unlinked_texts {
+        for (alias, span, sourcepos) in &mut self.new_unlinked_texts {
             let filename = get_filename(path);
-            let id = format!("{CODE}::{filename}::{alias}");
+            let linenum = sourcepos.start.line;
+            let colnum = sourcepos.start.column;
+            let id = format!("{CODE}::{filename}::{alias}::{linenum}::{colnum}");
             self.unlinked_texts.push(
                 UnlinkedText::builder()
                     .advice(format!(
