@@ -124,7 +124,7 @@ impl Visitor for WikilinkVisitor {
                     Wikilink::builder()
                         .alias(alias.clone())
                         .span(span_repaired)
-                        .build()
+                        .build(),
                 );
             }
         };
