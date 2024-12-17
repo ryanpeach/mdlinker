@@ -93,6 +93,11 @@ pub enum ParseError {
         #[backtrace]
         source: std::io::Error,
     },
+    #[error("Multibyte characters found in the file {file:?}")]
+    MultibyteError {
+        file: PathBuf,
+        backtrace: backtrace::Backtrace,
+    },
     #[error("Error parsing the source code for file {file:?} using tree-sitter")]
     TreeSitter {
         file: PathBuf,
@@ -119,6 +124,15 @@ pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<
         file: path.clone(),
         source,
     })?;
+
+    // Check for multibyte characters
+    if source.chars().count() != source.len() {
+        return Err(ParseError::MultibyteError {
+            file: path.clone(),
+            backtrace: backtrace::Backtrace::force_capture(),
+        });
+    }
+
     // Parse the source code
     let arena = Arena::new();
     let options = ExtensionOptionsBuilder::default()
