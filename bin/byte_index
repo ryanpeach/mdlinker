@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+
+import argparse
+
+def find_byte_indexes(text, search_term):
+    # Encode both the text and the search term into bytes
+    byte_text = text.encode('utf-8')
+    byte_search_term = search_term.encode('utf-8')
+
+    # Initialize a list to store the byte indexes
+    byte_indexes = []
+
+    # Start searching for the term in the byte_text
+    index = byte_text.find(byte_search_term)
+    while index != -1:
+        byte_indexes.append(index)
+        # Continue searching after the current match
+        index = byte_text.find(byte_search_term, index + 1)
+
+    return byte_indexes
+
+def main():
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description="Find byte indexes of a search term in a file.")
+    parser.add_argument("file", help="Path to the file to be searched")
+    parser.add_argument("search_term", help="The term to search for in the file")
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Read the file
+    try:
+        with open(args.file, 'r', encoding='utf-8') as f:
+            file_content = f.read()
+    except FileNotFoundError:
+        print(f"Error: File '{args.file}' not found.")
+        return
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return
+
+    # Find byte indexes
+    indexes = find_byte_indexes(file_content, args.search_term)
+
+    # Print the results
+    if indexes:
+        print(f"Found '{args.search_term}' at byte indexes: {indexes}")
+    else:
+        print(f"'{args.search_term}' not found in the file.")
+
+if __name__ == "__main__":
+    main()

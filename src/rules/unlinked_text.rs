@@ -181,20 +181,20 @@ impl Visitor for UnlinkedTextVisitor {
                     continue;
                 }
                 let alias = Alias::new(&patterns[found.pattern().as_usize()]);
-                let span = repair_span_due_to_frontmatter(
-                    SourceSpan::new(
-                        (SourceOffset::from_location(
-                            remove_frontmatter_from_source(source, node),
-                            sourcepos.start.line,
-                            sourcepos.start.column,
-                        )
-                        .offset()
-                            + found.start())
-                        .into(),
-                        found.end() - found.start(),
-                    ),
-                    node,
-                );
+                if "lorem" == alias.to_string() {
+                    println!("Found lorem");
+                }
+                let text_without_frontmatter = remove_frontmatter_from_source(source, node);
+                let sourcepos_start_offset_bytes = SourceOffset::from_location(
+                    text_without_frontmatter,
+                    sourcepos.start.line,
+                    sourcepos.start.column,
+                )
+                .offset();
+                let byte_length = found.end() - found.start();
+                let offset_bytes = sourcepos_start_offset_bytes + found.start();
+                let span = SourceSpan::new(offset_bytes.into(), byte_length);
+                let span_repaired = repair_span_due_to_frontmatter(span, node);
 
                 // Dont match inside wikilinks
                 if let Some(parent) = parent {
@@ -204,7 +204,7 @@ impl Visitor for UnlinkedTextVisitor {
                     }
                 }
 
-                self.new_unlinked_texts.push((alias, span));
+                self.new_unlinked_texts.push((alias, span_repaired));
             }
         }
         Ok(())
