@@ -58,7 +58,11 @@ impl ReportTrait for UnlinkedText {
     fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
         let file = self.src.name().to_owned();
         trace!("Fixing unlinked text: {:?}", file);
-        let mut source = self.src.inner().clone();
+        let mut source = std::fs::read_to_string(&file).map_err(|src| FixError::IOError {
+            source: src,
+            file: file.clone(),
+            backtrace: Backtrace::force_capture(),
+        })?;
         let start = self.span.offset();
         let end = start + self.span.len();
         if end >= source.len() {
@@ -240,6 +244,8 @@ impl Visitor for UnlinkedTextVisitor {
             std::mem::take(&mut self.unlinked_texts),
             excludes,
         ));
+        self.unlinked_texts.sort_by_key(|item| item.span.offset());
+        self.unlinked_texts.reverse();
         self.wikilink_visitor.finalize(excludes)?;
         Ok(self
             .unlinked_texts
