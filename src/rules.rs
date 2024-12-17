@@ -51,7 +51,7 @@ pub trait HasId {
 pub fn filter_code<T: HasId>(errors: Vec<T>, code: &ErrorCode) -> Vec<T> {
     errors
         .into_iter()
-        .filter(|item| &item.id() == code)
+        .filter(|item| item.id().0.starts_with(&code.0))
         .collect()
 }
 
