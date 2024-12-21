@@ -226,6 +226,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         &file_ngrams,
         config.filename_match_threshold,
         &filename_spacing_regex,
+        config,
     )?
     .finalize(&config.exclude);
     reports.extend(

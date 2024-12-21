@@ -29,10 +29,6 @@ pub(super) struct Config {
     #[serde(default)]
     pub boundary_pattern: Option<String>,
 
-    /// See [`super::cli::Config::wikilink_pattern`]
-    #[serde(default)]
-    pub wikilink_pattern: Option<String>,
-
     /// See [`super::cli::Config::filename_spacing_pattern`]
     #[serde(default)]
     pub filename_spacing_pattern: Option<String>,
@@ -44,6 +40,11 @@ pub(super) struct Config {
     /// See [`super::cli::Config::exclude`]
     #[serde(default)]
     pub exclude: Vec<String>,
+
+    /// In the [`crate::rules::similar_filename::SimilarFilename`] rule, ignore certain word pairs
+    /// Prevents some annoying and frequent false positives
+    #[serde(default)]
+    pub ignore_word_pairs: Vec<(String, String)>,
 
     /// Convert an alias to a filename
     /// Kinda like a sed command
@@ -138,5 +139,12 @@ impl Partial for Config {
     }
     fn allow_dirty(&self) -> Option<bool> {
         None
+    }
+    fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>> {
+        if self.ignore_word_pairs.is_empty() {
+            None
+        } else {
+            Some(self.ignore_word_pairs.clone())
+        }
     }
 }
