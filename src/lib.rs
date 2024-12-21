@@ -7,8 +7,7 @@ pub mod rules;
 pub mod sed;
 pub mod visitor;
 
-use std::{backtrace::Backtrace, cell::RefCell, env, rc::Rc};
-
+use console::{style, Emoji};
 use file::{get_files, name::ngrams};
 use indicatif::ProgressBar;
 use miette::{Diagnostic, Result};
@@ -17,6 +16,7 @@ use rules::{
     broken_wikilink::BrokenWikilinkVisitor, duplicate_alias::DuplicateAliasVisitor,
     similar_filename::SimilarFilename, Report, ReportTrait, ThirdPassRule,
 };
+use std::{backtrace::Backtrace, cell::RefCell, env, rc::Rc};
 use strum::IntoEnumIterator;
 use thiserror::Error;
 use visitor::{parse, FinalizeError, ParseError, Visitor};
@@ -28,6 +28,12 @@ use crate::rules::VecHasIdExtensions;
 pub struct OutputReport {
     pub reports: Vec<Report>,
 }
+
+static FIRST_PASS: Emoji<'_, '_> = Emoji("📃  ", "");
+static SECOND_PASS: Emoji<'_, '_> = Emoji("🔗  ", "");
+static CHECK: Emoji<'_, '_> = Emoji("🔍  ", "");
+static FIXES: Emoji<'_, '_> = Emoji("🔧  ", "");
+static CHECK_AGAIN: Emoji<'_, '_> = Emoji("💡  ", "");
 
 impl OutputReport {
     /// Get if this is empty
@@ -132,8 +138,29 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             }));
         }
     }
+    if env::var("RUNNING_TESTS").is_err() {
+        println!(
+            "{} {}Generating Error Reports...",
+            style("[1/2]").bold().dim(),
+            CHECK
+        );
+    };
 
     let mut output_report = check(config)?;
+
+    let bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
+        None
+    } else {
+        println!(
+            "{} {}Performing Fixes...",
+            style("[2/3]").bold().dim(),
+            FIXES
+        );
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_possible_truncation)]
+        Some(ProgressBar::new(output_report.reports.len() as u64))
+    };
+
     let mut any_fixes = false;
     for report in output_report.reports.clone() {
         if let Some(()) = match report {
@@ -148,9 +175,22 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         } {
             any_fixes = true;
         }
+        if let Some(bar) = &bar {
+            bar.inc(1);
+        }
+    }
+    if let Some(bar) = bar {
+        bar.finish_and_clear();
     }
 
     if any_fixes {
+        if env::var("RUNNING_TESTS").is_err() {
+            println!(
+                "{} {}Generating Error Reports After Fixes Applied...",
+                style("[3/3]").bold().dim(),
+                CHECK_AGAIN
+            );
+        };
         output_report = check(config)?;
     }
 
@@ -193,9 +233,14 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     let first_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
         None
     } else {
+        println!(
+            "{} {}Getting Aliases O(n)...",
+            style("[2/3]").bold().dim(),
+            FIRST_PASS
+        );
         #[allow(clippy::cast_sign_loss)]
         #[allow(clippy::cast_possible_truncation)]
-        Some(ProgressBar::new(all_files.len() as u64).with_prefix("First Pass"))
+        Some(ProgressBar::new(all_files.len() as u64))
     };
     let duplicate_alias_visitor = Rc::new(RefCell::new(DuplicateAliasVisitor::new(
         &all_files,
@@ -214,16 +259,21 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             .into_inner();
     reports.extend(duplicate_alias_visitor.finalize(&config.exclude)?);
     if let Some(bar) = &first_pass_bar {
-        bar.finish();
+        bar.finish_and_clear();
     }
 
     // Second Pass
     let second_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
         None
     } else {
+        println!(
+            "{} {}Checking Links O(n)...",
+            style("[3/3]").bold().dim(),
+            SECOND_PASS
+        );
         #[allow(clippy::cast_sign_loss)]
         #[allow(clippy::cast_possible_truncation)]
-        Some(ProgressBar::new(all_files.len() as u64).with_prefix("Second Pass"))
+        Some(ProgressBar::new(all_files.len() as u64))
     };
     let mut visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![];
     for rule in ThirdPassRule::iter() {
@@ -255,7 +305,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         reports.extend(visitor_cell.finalize(&config.exclude)?);
     }
     if let Some(bar) = &second_pass_bar {
-        bar.finish();
+        bar.finish_and_clear();
     }
 
     Ok(OutputReport { reports })
