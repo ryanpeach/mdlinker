@@ -4,6 +4,7 @@ use crate::{
     ngrams::{MissingSubstringError, Ngram},
     rules::HasId,
 };
+use console::{style, Emoji};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use hashbrown::HashMap;
@@ -19,6 +20,8 @@ use thiserror::Error;
 use super::{ErrorCode, FixError, ReportTrait};
 
 pub const CODE: &str = "name::similar";
+
+static SIMILAR: Emoji<'_, '_> = Emoji("🤝  ", "");
 
 #[derive(Error, Debug, Diagnostic, Clone)]
 #[error("Filenames are similar")]
@@ -152,9 +155,14 @@ impl SimilarFilename {
         let file_crosscheck_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
             None
         } else {
+            println!(
+                "{} {}Searching for Similar Filenames O(n^2)...",
+                style("[1/3]").bold().dim(),
+                SIMILAR
+            );
             #[allow(clippy::cast_sign_loss)]
             #[allow(clippy::cast_possible_truncation)]
-            Some(ProgressBar::new((n * (n + 1.0) / 2.0) as u64).with_prefix("Crosschecking files"))
+            Some(ProgressBar::new((n * (n + 1.0) / 2.0) as u64))
         };
         let matcher = SkimMatcherV2::default();
         let mut matches: Vec<SimilarFilename> = Vec::new();
@@ -196,7 +204,7 @@ impl SimilarFilename {
             }
         }
         if let Some(bar) = file_crosscheck_bar {
-            bar.finish();
+            bar.finish_and_clear();
         }
         Ok(matches)
     }
