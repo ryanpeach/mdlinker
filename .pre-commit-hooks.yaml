@@ -8,7 +8,7 @@
     name: Enforce ASCII Compliance
     description: Detects and replaces non-ASCII characters in specified files.
     entry: ./bin/enforce-ascii
-    language: system
+    language: script
     pass_filenames: true
     always_run: false
     args:
