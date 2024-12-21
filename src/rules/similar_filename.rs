@@ -156,7 +156,7 @@ impl SimilarFilename {
             None
         } else {
             println!(
-                "{} {}Searching for Similar Filenames O(n^2)...",
+                "  {} {}Searching for Similar Filenames O(n^2)...",
                 style("[1/3]").bold().dim(),
                 SIMILAR
             );

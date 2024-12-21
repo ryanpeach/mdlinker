@@ -34,6 +34,7 @@ static SECOND_PASS: Emoji<'_, '_> = Emoji("🔗  ", "");
 static CHECK: Emoji<'_, '_> = Emoji("🔍  ", "");
 static FIXES: Emoji<'_, '_> = Emoji("🔧  ", "");
 static CHECK_AGAIN: Emoji<'_, '_> = Emoji("💡  ", "");
+static NO_FIXES: Emoji<'_, '_> = Emoji("🎉  ", "");
 
 impl OutputReport {
     /// Get if this is empty
@@ -141,7 +142,7 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     if env::var("RUNNING_TESTS").is_err() {
         println!(
             "{} {}Generating Error Reports...",
-            style("[1/2]").bold().dim(),
+            style("[1/3]").bold().dim(),
             CHECK
         );
     };
@@ -192,6 +193,12 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             );
         };
         output_report = check(config)?;
+    } else if env::var("RUNNING_TESTS").is_err() {
+        println!(
+            "{} {}No Fixes Found...",
+            style("[3/3]").bold().dim(),
+            NO_FIXES
+        );
     }
 
     Ok(output_report)
@@ -234,7 +241,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         None
     } else {
         println!(
-            "{} {}Getting Aliases O(n)...",
+            "  {} {}Getting Aliases O(n)...",
             style("[2/3]").bold().dim(),
             FIRST_PASS
         );
@@ -267,7 +274,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         None
     } else {
         println!(
-            "{} {}Checking Links O(n)...",
+            "  {} {}Checking Links O(n)...",
             style("[3/3]").bold().dim(),
             SECOND_PASS
         );
