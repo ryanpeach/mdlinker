@@ -146,6 +146,7 @@ impl SimilarFilename {
         file_ngrams: &HashMap<Ngram, PathBuf>,
         filename_match_threshold: i64,
         spacing_regex: &Regex,
+        config: &Config,
     ) -> Result<Vec<SimilarFilename>, MissingSubstringError> {
         // Convert all filenames to a single string
         // Check if any two file ngrams fuzzy match
@@ -170,6 +171,16 @@ impl SimilarFilename {
             for (other_ngram, other_filepath) in file_ngrams {
                 if ngram.nb_words() != other_ngram.nb_words() {
                     continue;
+                }
+
+                // TODO: This can be improved computationally using a hashmap
+                for (a, b) in &config.ignore_word_pairs {
+                    if &ngram.to_string() == a && &other_ngram.to_string() == b {
+                        continue;
+                    }
+                    if &ngram.to_string() == b && &other_ngram.to_string() == a {
+                        continue;
+                    }
                 }
 
                 if let Some(bar) = &file_crosscheck_bar {

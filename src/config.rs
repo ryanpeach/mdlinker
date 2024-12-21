@@ -69,6 +69,9 @@ pub struct Config {
     /// See [`self::cli::Config::allow_dirty`]
     #[builder(default = false)]
     pub allow_dirty: bool,
+    /// See [`self::file::Config::ignore_word_pairs`]
+    #[builder(default = vec![])]
+    pub ignore_word_pairs: Vec<(String, String)>,
 }
 
 /// Things which implement the partial config trait
@@ -91,6 +94,7 @@ pub trait Partial {
     ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairCompilationError>>;
     fn fix(&self) -> Option<bool>;
     fn allow_dirty(&self) -> Option<bool>;
+    fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>>;
 }
 
 /// Now we implement a combine function for patrial configs which
@@ -124,6 +128,7 @@ fn combine_partials(partials: &[&dyn Partial]) -> Result<Config, NewConfigError>
                 .ok_or(NewConfigError::PagesDirectoryMissing)?,
         )
         .maybe_other_directories(partials.iter().find_map(|p| p.other_directories()))
+        .maybe_ignore_word_pairs(partials.iter().find_map(|p| p.ignore_word_pairs()))
         .build())
 }
 

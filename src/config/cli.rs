@@ -110,4 +110,7 @@ impl Partial for Config {
     fn allow_dirty(&self) -> Option<bool> {
         Some(self.allow_dirty)
     }
+    fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>> {
+        None
+    }
 }
