@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import sys
 import argparse
-import re
 
-def process_file(file_path, char_map=None):
+def process_file(file_path, char_map=None) -> set[str]:
     """Process a file to find or replace non-ASCII characters."""
     non_ascii_chars = set()
     output_lines = []
@@ -86,10 +85,16 @@ def main():
         print("No files specified or provided via stdin.", file=sys.stderr)
         return
 
+    found = False
     for file_path in files:
         non_ascii_chars = process_file(file_path, char_map if args.fix else None)
         if non_ascii_chars:
             print(f"Non-ASCII characters found in {file_path}: {''.join(non_ascii_chars)}")
+            found = True
+
+    if found:
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
