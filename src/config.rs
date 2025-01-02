@@ -157,7 +157,7 @@ impl Config {
         };
 
         // CLI has priority over file by being last
-        combine_partials(&[&file, &cli]).map_err(derive_more::Into::into)
+        combine_partials(&[&file, &cli])
     }
 
     /// Legacy directories function
