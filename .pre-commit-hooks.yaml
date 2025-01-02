@@ -9,6 +9,7 @@
     description: Detects and replaces non-ASCII characters in specified files.
     entry: ./bin/enforce-ascii
     language: script
+    types: [text]
     pass_filenames: true
     always_run: false
     args:
