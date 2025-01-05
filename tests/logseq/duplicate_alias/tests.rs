@@ -19,7 +19,7 @@ lazy_static! {
 #[test]
 fn number_of_duplicate_alias() {
     info!("number_of_duplicate_alias");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for duplicate_alias in &report.duplicate_aliases() {
         debug!("{duplicate_alias:#?}");
     }
@@ -29,7 +29,7 @@ fn number_of_duplicate_alias() {
 #[test]
 fn filename_alias_relation() {
     info!("filename_alias_relation");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for duplicate_alias in &report.duplicate_aliases() {
         debug!("{duplicate_alias:#?}");
     }
@@ -46,7 +46,7 @@ fn filename_alias_relation() {
 #[test]
 fn filecontent_filecontent_relation() {
     info!("filecontent_filecontent_relation");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for duplicate_alias in &report.duplicate_aliases() {
         debug!("{duplicate_alias:#?}");
     }
@@ -63,7 +63,7 @@ fn filecontent_filecontent_relation() {
 #[test]
 fn duplicate_ipsum() {
     info!("duplicate_ipsum_span");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for duplicate_alias in &report.duplicate_aliases() {
         debug!("{duplicate_alias:#?}");
     }
@@ -80,7 +80,7 @@ fn duplicate_ipsum() {
 #[test]
 fn duplicate_ipsum_span() {
     info!("duplicate_ipsum");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     let err_list = filter_code(
         report.duplicate_aliases(),
         &format!("{}::ipsum", duplicate_alias::CODE).into(),

@@ -20,7 +20,7 @@ use super::content::wikilink::Alias;
 /// # Example
 /// `asdf/Foo___Bar.md` -> `Foo___Bar`
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct Filename(String);
+pub struct Filename(pub String);
 
 impl Filename {
     #[must_use]
@@ -47,7 +47,7 @@ impl From<String> for Filename {
 
 /// Sometimes you are given a lowercase [`Filename`] and you have to make due
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct FilenameLowercase(String);
+pub struct FilenameLowercase(pub String);
 
 impl FilenameLowercase {
     #[must_use]
