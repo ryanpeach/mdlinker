@@ -4,7 +4,7 @@ use crate::{
         content::{front_matter::FrontMatterVisitor, wikilink::Alias},
         name::{get_filename, Filename},
     },
-    ngrams::MissingSubstringError,
+    ngrams::CalculateError,
     sed::{ReplacePair, ReplacePairCompilationError},
     visitor::{FinalizeError, VisitError, Visitor},
 };
@@ -185,27 +185,13 @@ impl Visitor for DuplicateAliasVisitor {
 #[derive(Error, Debug)]
 pub enum NewDuplicateAliasError {
     #[error(transparent)]
-    MissingSubstringError(#[from] MissingSubstringError),
+    CalculateError(#[from] CalculateError),
     #[error(transparent)]
     ReplacePairError(#[from] ReplacePairCompilationError),
     #[error("The file {filename} contains its own alias {alias}")]
     AliasAndFilenameSame { filename: Filename, alias: Alias },
 }
-//
-// #[derive(Error, Debug)]
-// pub enum CalculateError {
-//     #[error(transparent)]
-//     MissingSubstringError(#[from] MissingSubstringError),
-//     #[error(transparent)]
-//     ReplacePairError(#[from] ReplacePairCompilationError),
-//     #[error(transparent)]
-//     FileError(#[from] file::Error),
-//     #[error(transparent)]
-//     NewDuplicateAliasError(#[from] NewDuplicateAliasError),
-//     #[error(transparent)]
-//     IoError(#[from] std::io::Error),
-// }
-//
+
 impl DuplicateAlias {
     /// Create a new diagnostic
     /// based on the two filenames and their similar ngrams
@@ -247,7 +233,7 @@ impl DuplicateAlias {
             let file2_content_found = file2_content
                 .to_lowercase()
                 .find(&alias.to_string())
-                .ok_or_else(|| MissingSubstringError {
+                .ok_or_else(|| CalculateError::MissingSubstringError {
                     path: file2_path.to_path_buf(),
                     ngram: alias.to_string(),
                     backtrace: std::backtrace::Backtrace::capture(),
@@ -280,7 +266,7 @@ impl DuplicateAlias {
             let file1_content_found = file1_content
                 .to_lowercase()
                 .find(&alias.to_string())
-                .ok_or_else(|| MissingSubstringError {
+                .ok_or_else(|| CalculateError::MissingSubstringError {
                     path: file1_path.to_path_buf(),
                     ngram: alias.to_string(),
                     backtrace: std::backtrace::Backtrace::capture(),
@@ -288,7 +274,7 @@ impl DuplicateAlias {
             let file2_content_found = file2_content
                 .to_lowercase()
                 .find(&alias.to_string())
-                .ok_or_else(|| MissingSubstringError {
+                .ok_or_else(|| CalculateError::MissingSubstringError {
                     path: file2_path.to_path_buf(),
                     ngram: alias.to_string(),
                     backtrace: std::backtrace::Backtrace::capture(),

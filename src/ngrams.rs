@@ -3,15 +3,23 @@ use std::{
     path::PathBuf,
 };
 
-use regex::Regex;
+use regex::{Error as RegexError, Regex};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-#[error("{path} does not contain the ngram {ngram}")]
-pub struct MissingSubstringError {
-    pub path: PathBuf,
-    pub ngram: String,
-    pub backtrace: std::backtrace::Backtrace,
+pub enum CalculateError {
+    #[error("{path} does not contain the ngram {ngram}")]
+    MissingSubstringError {
+        path: PathBuf,
+        ngram: String,
+        backtrace: std::backtrace::Backtrace,
+    },
+    #[error("'{compilation_string}' regex did not compile: {source:?}")]
+    RegexCompilationError {
+        source: RegexError,
+        compilation_string: String,
+        backtrace: std::backtrace::Backtrace,
+    },
 }
 
 /// An ngram, " " seperated, lowercase

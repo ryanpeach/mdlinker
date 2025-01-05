@@ -11,7 +11,7 @@ use console::{style, Emoji};
 use file::{get_files, name::ngrams};
 use indicatif::ProgressBar;
 use miette::{Diagnostic, Result};
-use ngrams::MissingSubstringError;
+use ngrams::CalculateError;
 use rules::{
     broken_wikilink::BrokenWikilinkVisitor, duplicate_alias::DuplicateAliasVisitor,
     similar_filename::SimilarFilename, Report, ReportTrait, ThirdPassRule,
@@ -89,7 +89,7 @@ pub enum OutputErrors {
     #[error(transparent)]
     RegexError(#[from] regex::Error),
     #[error(transparent)]
-    MissingSubstringError(#[from] MissingSubstringError),
+    CalculateError(#[from] CalculateError),
     #[error(transparent)]
     ParseError(#[from] ParseError),
     #[error(transparent)]

@@ -84,7 +84,7 @@ fn test_ignore_word_pairs2() {
 
 #[test]
 fn test_logseq_same_group() {
-    let spacing = Regex::new("___").expect("Constant");
+    let spacing = Regex::new("-|_|\\s").expect("Constant");
 
     // (file1, file2, expected_result)
     let cases = vec![
@@ -104,12 +104,11 @@ fn test_logseq_same_group() {
     for (f1, f2, expected) in cases {
         let path1 = PathBuf::from(f1);
         let path2 = PathBuf::from(f2);
-        let result = SimilarFilename::skip_special_cases(&path1, &path2, &spacing);
+        let result = SimilarFilename::skip_special_cases(&path1, &path2, &spacing)
+            .expect("These are all constants");
         assert_eq!(
             result, expected,
-            "Failure on pair {:?} : {:?}, expected {:?}, got {:?}",
-            f1, f2, expected, result
+            "Failure on pair {f1:?} : {f2:?}, expected {expected:?}, got {result:?}"
         );
     }
-    assert!(false);
 }
