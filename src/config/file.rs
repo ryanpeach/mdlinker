@@ -11,10 +11,10 @@ use crate::{
     sed::{ReplacePair, ReplacePairCompilationError},
 };
 
-use super::{NewConfigError, Partial};
+use super::{Config as MasterConfig, NewConfigError, Partial};
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub(super) struct Config {
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct Config {
     /// See [`super::cli::Config::pages_directory`]
     pub pages_directory: PathBuf,
 
@@ -62,6 +62,23 @@ impl Config {
         let contents =
             std::fs::read_to_string(path).map_err(NewConfigError::FileDoesNotReadError)?;
         toml::from_str(&contents).map_err(NewConfigError::FileDoesNotParseError)
+    }
+}
+
+impl From<MasterConfig> for Config {
+    fn from(value: MasterConfig) -> Self {
+        Self {
+            pages_directory: value.pages_directory,
+            other_directories: value.other_directories,
+            ngram_size: Some(value.ngram_size),
+            boundary_pattern: Some(value.boundary_pattern),
+            filename_spacing_pattern: Some(value.filename_spacing_pattern),
+            filename_match_threshold: Some(value.filename_match_threshold),
+            exclude: value.exclude.into_iter().map(|x| x.0).collect(),
+            ignore_word_pairs: value.ignore_word_pairs,
+            alias_to_filename: value.alias_to_filename.into(),
+            filename_to_alias: value.filename_to_alias.into(),
+        }
     }
 }
 
@@ -146,5 +163,9 @@ impl Partial for Config {
         } else {
             Some(self.ignore_word_pairs.clone())
         }
+    }
+
+    fn ignore_remaining(&self) -> Option<bool> {
+        None
     }
 }

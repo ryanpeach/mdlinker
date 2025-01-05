@@ -12,7 +12,7 @@ use crate::{
 
 use super::Partial;
 
-#[derive(Parser, Default)]
+#[derive(Parser, Default, Clone)]
 #[command(version, about, long_about = None)]
 pub(super) struct Config {
     /// The pages directory is the directory where pages are named for their alias
@@ -60,6 +60,10 @@ pub(super) struct Config {
     /// the git repo has uncommitted changes
     #[clap(long = "allow-dirty")]
     pub allow_dirty: bool,
+
+    /// Ignore remaining errors by adding them to the config
+    #[clap(long = "ignore-remaining")]
+    pub ignore_remaining: bool,
 }
 
 impl Partial for Config {
@@ -112,5 +116,8 @@ impl Partial for Config {
     }
     fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>> {
         None
+    }
+    fn ignore_remaining(&self) -> Option<bool> {
+        Some(self.ignore_remaining)
     }
 }
