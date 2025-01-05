@@ -116,6 +116,7 @@ pub enum ParseError {
 }
 
 /// Parse the source code and visit all the nodes using tree-sitter
+#[allow(clippy::result_large_err)]
 pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<(), ParseError> {
     debug!("Parsing file {:?}", path);
     let source = std::fs::read_to_string(path).map_err(|source| ParseError::IoError {
