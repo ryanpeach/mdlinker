@@ -31,6 +31,16 @@ where
     _u: std::marker::PhantomData<U>,
 }
 
+impl<T, U> From<ReplacePair<T, U>> for (String, String)
+where
+    T: ToString + From<String>,
+    U: ToString + From<String>,
+{
+    fn from(val: ReplacePair<T, U>) -> Self {
+        (val.from.as_str().to_owned(), val.to.as_str().to_owned())
+    }
+}
+
 impl<T, U> ReplacePair<T, U>
 where
     T: ToString + From<String>,

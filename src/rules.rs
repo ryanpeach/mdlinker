@@ -39,7 +39,7 @@ pub enum ThirdPassReport {
 /// A Reports error code, usually like `asdf::asdf::asdf`
 /// Uniquely identifies a violation of a rule, and can be deduped by Eq
 #[derive(Debug, Constructor, PartialEq, Eq, PartialOrd, Ord, Clone, From, Into)]
-pub struct ErrorCode(String);
+pub struct ErrorCode(pub String);
 
 /// All reports should have a code that can be human readable
 /// Codes's should also be useful to deduplicate errors before presenting them to the user
