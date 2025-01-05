@@ -21,7 +21,7 @@ lazy_static! {
 #[test]
 fn number_of_unlinked_texts() {
     info!("number_of_unlinked_texts");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for unlinked_texts in &report.unlinked_texts() {
         debug!("{unlinked_texts:#?}");
     }
@@ -32,7 +32,7 @@ fn number_of_unlinked_texts() {
 #[test]
 fn lorem_exist_and_is_wikilink() {
     info!("lorem_exist_and_is_wikilink");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for unlinked_text in &report.unlinked_texts() {
         debug!("{unlinked_text:#?}");
     }
@@ -47,7 +47,7 @@ fn lorem_exist_and_is_wikilink() {
 #[test]
 fn ipsum_is_alias_and_is_not_wikilink_in_journal() {
     info!("ipsum_is_alias_and_is_not_wikilink_in_journal");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for unlinked_text in &report.unlinked_texts() {
         debug!("{unlinked_text:#?}");
     }
@@ -61,7 +61,7 @@ fn ipsum_is_alias_and_is_not_wikilink_in_journal() {
 #[test]
 fn dolors_exists_and_is_not_wikilink_in_foo() {
     info!("dolors_exists_and_is_not_wikilink_in_foo");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for unlinked_text in &report.unlinked_texts() {
         debug!("{unlinked_text:#?}");
     }
@@ -75,7 +75,7 @@ fn dolors_exists_and_is_not_wikilink_in_foo() {
 #[test]
 fn dolors_exists_and_is_not_wikilink_in_foo_span() {
     info!("dolors_exists_and_is_not_wikilink_in_foo_span");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     let err_list = filter_code(
         report.unlinked_texts(),
         &format!("{}::foo::dolors", unlinked_text::CODE).into(),
@@ -89,7 +89,7 @@ fn dolors_exists_and_is_not_wikilink_in_foo_span() {
 #[test]
 fn icazyvey_exists_and_is_not_wikilink_in_journal() {
     info!("icazyvey_exists_and_is_not_wikilink_in_journal");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     let err_list = filter_code(
         report.unlinked_texts(),
         &format!("{}::2024_08_10::icazyvey", unlinked_text::CODE).into(),

@@ -193,7 +193,7 @@ impl SimilarFilename {
                 }
 
                 // Each editor will have its own special cases, lets centralize them
-                if SimilarFilename::skip_special_cases(filepath, other_filepath) {
+                if SimilarFilename::skip_special_cases(filepath, other_filepath, spacing_regex) {
                     continue;
                 }
 
@@ -223,17 +223,27 @@ impl SimilarFilename {
 
 /// Each editor will have its own special cases, lets centralize them
 impl SimilarFilename {
-    /// Centralize the special cases for skipping
-    fn skip_special_cases(file1: &Path, file2: &Path) -> bool {
-        SimilarFilename::logseq_same_group(file1, file2)
-    }
+    pub fn skip_special_cases(file1: &Path, file2: &Path, spacing_regex: &Regex) -> bool {
+        let file1_str = get_filename(file1).0;
+        let file2_str = get_filename(file2).0;
 
-    /// Logseq has a special case if one startswith the other then
-    /// its probably a part of the same group
-    fn logseq_same_group(file1: &Path, file2: &Path) -> bool {
-        let file1 = get_filename(file1);
-        let file2 = get_filename(file2);
-        file1.to_string().starts_with(&file2.to_string())
-            || file2.to_string().starts_with(&file1.to_string())
+        // If file1 is a prefix of file2 (with spacing), or file2 is a prefix of file1 (with spacing)
+        let file1_is_prefix = Regex::new(&format!(
+            "^{}{}",
+            regex::escape(&file1_str),
+            spacing_regex.as_str()
+        ))
+        .unwrap();
+        let file2_is_prefix = Regex::new(&format!(
+            "^{}{}",
+            regex::escape(&file2_str),
+            spacing_regex.as_str()
+        ))
+        .unwrap();
+
+        let out = file1_is_prefix.is_match(&file2_str) || file2_is_prefix.is_match(&file1_str);
+
+        println!("{:?} : {:?} : {:?}", file1_str, file2_str, out);
+        out
     }
 }
