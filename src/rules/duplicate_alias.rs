@@ -148,14 +148,17 @@ impl Visitor for DuplicateAliasVisitor {
             // If it did not exist, we have a new alias in our table
             if let Some(out) = self.alias_table.insert(alias.clone(), path.into()) {
                 self.duplicate_aliases.insert(alias.clone());
-                self.duplicate_alias_errors.push(DuplicateAlias::new(
+                let found = DuplicateAlias::new(
                     &alias,
                     path,
                     Some(source),
                     &out,
                     None,
                     &self.filename_to_alias,
-                )?);
+                )?;
+                if let Some(found) = found {
+                    self.duplicate_alias_errors.push(found);
+                }
             }
         }
 
@@ -185,8 +188,6 @@ pub enum NewDuplicateAliasError {
     CalculateError(#[from] CalculateError),
     #[error(transparent)]
     ReplacePairError(#[from] ReplacePairCompilationError),
-    #[error("The file {filename} contains its own alias {alias}")]
-    AliasAndFilenameSame { filename: Filename, alias: Alias },
 }
 
 impl DuplicateAlias {
@@ -203,14 +204,11 @@ impl DuplicateAlias {
         file2_path: &Path,
         file2_content: Option<&str>,
         filename_to_alias: &ReplacePair<Filename, Alias>,
-    ) -> Result<Self, NewDuplicateAliasError> {
+    ) -> Result<Option<Self>, NewDuplicateAliasError> {
         assert!(!alias.to_string().is_empty());
         // Boundary conditions
         if file1_path == file2_path {
-            return Err(NewDuplicateAliasError::AliasAndFilenameSame {
-                filename: get_filename(file1_path),
-                alias: alias.clone(),
-            });
+            return Ok(None);
         }
 
         // Create the unique id
@@ -242,13 +240,13 @@ impl DuplicateAlias {
                 alias.to_string().len(),
             );
 
-            Ok(DuplicateAlias::FileNameContentDuplicate {
+            Ok(Some(DuplicateAlias::FileNameContentDuplicate {
                 id: id.into(),
                 other_filename: get_filename(file1_path),
                 src: NamedSource::new(file2_path.to_string_lossy(), file2_content.to_string()),
                 alias: file2_content_span,
                 advice: format!("Delete the alias from {}", file2_path.to_string_lossy()),
-            })
+            }))
         } else if Alias::from_filename(&get_filename(file2_path), filename_to_alias) == *alias {
             Self::new(
                 alias,
@@ -287,7 +285,7 @@ impl DuplicateAlias {
                 alias.to_string().len(),
             );
 
-            Ok(DuplicateAlias::FileContentContentDuplicate {
+            Ok(Some(DuplicateAlias::FileContentContentDuplicate {
                 advice: format!("id: {id:?}"),
                 id: id.clone().into(),
                 other_filename: get_filename(file2_path),
@@ -301,7 +299,7 @@ impl DuplicateAlias {
                     alias: file2_content_span,
                     other: vec![],
                 }],
-            })
+            }))
         }
     }
 }
