@@ -1,4 +1,4 @@
-mod cli;
+pub mod cli;
 pub mod file;
 use std::path::PathBuf;
 

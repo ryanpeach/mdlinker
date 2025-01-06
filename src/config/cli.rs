@@ -14,7 +14,7 @@ use super::Partial;
 
 #[derive(Parser, Default, Clone)]
 #[command(version, about, long_about = None)]
-pub(super) struct Config {
+pub struct Config {
     /// The pages directory is the directory where pages are named for their alias
     /// and where new pages should be created when running --fix
     #[clap(short = 'p', long = "pages")]
