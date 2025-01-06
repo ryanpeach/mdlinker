@@ -1,4 +1,6 @@
 use crate::common::get_report;
+use config::cli::Config as CliConfig;
+use config::file::Config as FileConfig;
 use lazy_static::lazy_static;
 use log::info;
 use mdlinker::rules::similar_filename::SimilarFilename;
@@ -21,6 +23,8 @@ fn groups_first_element_same() {
             PathBuf::from_str("./tests/logseq/similar_filename/assets/pages")
                 .expect("This is a constant"),
         )
+        .file_config(FileConfig::default())
+        .cli_config(CliConfig::default())
         .filename_match_threshold(1)
         .build();
 
@@ -43,6 +47,8 @@ fn test_ignore_word_pairs1() {
             PathBuf::from_str("./tests/logseq/similar_filename/assets/pages")
                 .expect("This is a constant"),
         )
+        .file_config(FileConfig::default())
+        .cli_config(CliConfig::default())
         .filename_match_threshold(1)
         .ignore_word_pairs(vec![("foo".to_string(), "fooo".to_string())])
         .build();
@@ -66,6 +72,8 @@ fn test_ignore_word_pairs2() {
             PathBuf::from_str("./tests/logseq/similar_filename/assets/pages")
                 .expect("This is a constant"),
         )
+        .file_config(FileConfig::default())
+        .cli_config(CliConfig::default())
         .filename_match_threshold(1)
         .ignore_word_pairs(vec![
             ("bar".to_string(), "barr".to_string()),

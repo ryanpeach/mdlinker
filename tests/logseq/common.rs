@@ -1,7 +1,10 @@
 //! Code used in multiple test folders
 use std::{path::PathBuf, str::FromStr};
 
-use mdlinker::{config::Config, lib};
+use mdlinker::{
+    config::{cli::Config as CliConfig, file::Config as FileConfig, Config},
+    lib,
+};
 
 use std::sync::Once;
 
@@ -27,6 +30,8 @@ pub fn get_report(paths: &[String], config: Option<Config>) -> mdlinker::OutputR
             Config::builder()
                 .pages_directory(paths[0].clone())
                 .other_directories(paths[1..].to_vec())
+                .cli_config(CliConfig::default())
+                .file_config(FileConfig::default())
                 .build()
         }
         Some(config) => config,
