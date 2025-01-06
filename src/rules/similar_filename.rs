@@ -1,8 +1,7 @@
 use crate::{
-    config::Config,
+    config::{file::Config as FileConfig, Config},
     file::name::get_filename,
     ngrams::{CalculateError, Ngram},
-    rules::HasId,
 };
 use console::{style, Emoji};
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -18,7 +17,7 @@ use std::{
 };
 use thiserror::Error;
 
-use super::{ErrorCode, FixError, ReportTrait};
+use super::{ErrorCode, FixError, IgnoreError, ReportTrait};
 
 pub const CODE: &str = "name::similar";
 
@@ -30,6 +29,8 @@ static SIMILAR: Emoji<'_, '_> = Emoji("🤝  ", "");
 pub struct SimilarFilename {
     /// Used to identify the diagnostic and exclude it if needed
     id: ErrorCode,
+    file1_ngram: Ngram,
+    file2_ngram: Ngram,
 
     score: i64,
 
@@ -37,17 +38,25 @@ pub struct SimilarFilename {
     filepaths: String,
 
     #[label("This bit here")]
-    file1_ngram: SourceSpan,
+    file1_ngram_span: SourceSpan,
 
     #[label("That bit there")]
-    file2_ngram: SourceSpan,
+    file2_ngram_span: SourceSpan,
 
     #[help]
     advice: String,
 }
 impl ReportTrait for SimilarFilename {
+    fn id(&self) -> ErrorCode {
+        self.id.clone()
+    }
     fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
         Ok(None)
+    }
+    fn ignore(&self, config: &mut FileConfig) -> Result<(), IgnoreError> {
+        Ok(config
+            .ignore_word_pairs
+            .push((self.file1_ngram.to_string(), self.file2_ngram.to_string())))
     }
 }
 
@@ -60,12 +69,6 @@ impl PartialOrd for SimilarFilename {
 impl PartialEq for SimilarFilename {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
-    }
-}
-
-impl HasId for SimilarFilename {
-    fn id(&self) -> ErrorCode {
-        self.id.clone()
     }
 }
 
@@ -108,11 +111,11 @@ impl SimilarFilename {
             })?;
 
         // Create the spans
-        let file1_ngram = SourceSpan::new(
+        let file1_ngram_span = SourceSpan::new(
             SourceOffset::from_location(&source, 1, find1 + 1),
             file1_ngram.len(),
         );
-        let file2_ngram = SourceSpan::new(
+        let file2_ngram_span = SourceSpan::new(
             SourceOffset::from_location(&source, 2, find2 + 1),
             file2_ngram.len(),
         );
@@ -137,9 +140,11 @@ impl SimilarFilename {
             id: id.into(),
             score,
             filepaths,
-            file1_ngram,
-            file2_ngram,
+            file1_ngram_span,
+            file2_ngram_span,
             advice,
+            file1_ngram: file1_ngram.clone(),
+            file2_ngram: file2_ngram.clone(),
         })
     }
 

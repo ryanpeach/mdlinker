@@ -17,7 +17,7 @@ use std::{
 };
 use thiserror::Error;
 
-use super::{dedupe_by_code, filter_by_excludes, ErrorCode, FixError, HasId, Report, ReportTrait};
+use super::{dedupe_by_code, filter_by_excludes, ErrorCode, FixError, Report, ReportTrait};
 
 pub const CODE: &str = "name::alias::duplicate";
 
@@ -69,17 +69,14 @@ pub enum DuplicateAlias {
     },
 }
 impl ReportTrait for DuplicateAlias {
-    fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
-        Ok(None)
-    }
-}
-
-impl HasId for DuplicateAlias {
     fn id(&self) -> ErrorCode {
         match self {
             DuplicateAlias::FileNameContentDuplicate { id: code, .. }
             | DuplicateAlias::FileContentContentDuplicate { id: code, .. } => code.clone(),
         }
+    }
+    fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
+        Ok(None)
     }
 }
 

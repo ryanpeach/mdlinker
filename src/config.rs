@@ -1,5 +1,5 @@
 mod cli;
-mod file;
+pub mod file;
 use std::path::PathBuf;
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
         content::wikilink::Alias,
         name::{Filename, FilenameLowercase},
     },
-    rules::ErrorCode,
+    rules::{ErrorCode, IgnoreError, ReportTrait},
     sed::{ReplacePair, ReplacePairCompilationError},
 };
 use bon::Builder;
@@ -236,6 +236,10 @@ impl Config {
         out.push(self.pages_directory.clone());
         out.extend(self.other_directories.clone());
         out
+    }
+
+    pub fn add_report_to_ignore(&mut self, report: impl ReportTrait) -> Result<(), IgnoreError> {
+        report.ignore(&mut self.file_config)
     }
 
     pub fn save_config(&self) -> Result<(), SaveConfigError> {
