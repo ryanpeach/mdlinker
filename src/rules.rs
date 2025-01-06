@@ -110,10 +110,6 @@ pub enum FixError {
     },
 }
 
-/// Returned by [`ReportTrait::ignore`]
-#[derive(Error, Debug, Diagnostic)]
-pub enum IgnoreError {}
-
 pub trait ReportTrait {
     /// All reports should have a code that can be human readable
     /// Codes's should also be useful to deduplicate errors before presenting them to the user
@@ -126,8 +122,8 @@ pub trait ReportTrait {
 
     /// Adds the id to the config file as an ignore
     /// This has a default implementation
-    fn ignore(&self, config: &mut FileConfig) -> Result<(), IgnoreError> {
-        Ok(config.exclude.push(self.id().0))
+    fn ignore(&self, config: &mut FileConfig) {
+        config.exclude.push(self.id().0);
     }
 }
 
