@@ -6,7 +6,7 @@ use crate::{
 use console::{style, Emoji};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use indicatif::ProgressBar;
 use miette::{Diagnostic, SourceOffset, SourceSpan};
 use regex::Regex;
@@ -17,7 +17,7 @@ use std::{
 };
 use thiserror::Error;
 
-use super::{ErrorCode, FixError, IgnoreError, ReportTrait};
+use super::{ErrorCode, FixError, ReportTrait};
 
 pub const CODE: &str = "name::similar";
 
@@ -53,10 +53,10 @@ impl ReportTrait for SimilarFilename {
     fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
         Ok(None)
     }
-    fn ignore(&self, config: &mut FileConfig) -> Result<(), IgnoreError> {
-        Ok(config
+    fn ignore(&self, config: &mut FileConfig) {
+        config
             .ignore_word_pairs
-            .push((self.file1_ngram.to_string(), self.file2_ngram.to_string())))
+            .push((self.file1_ngram.to_string(), self.file2_ngram.to_string()));
     }
 }
 
@@ -169,30 +169,39 @@ impl SimilarFilename {
             );
             #[allow(clippy::cast_sign_loss)]
             #[allow(clippy::cast_possible_truncation)]
-            Some(ProgressBar::new((n * (n + 1.0) / 2.0) as u64))
+            Some(ProgressBar::new((n * n) as u64))
         };
         let matcher = SkimMatcherV2::default();
         let mut matches: Vec<SimilarFilename> = Vec::new();
+        let mut seen_ngrams = HashSet::<(Ngram, Ngram)>::new();
+        let ignore_word_pairs: HashSet<(String, String)> =
+            config.ignore_word_pairs.iter().cloned().collect();
         for (ngram, filepath) in file_ngrams {
-            'outer: for (other_ngram, other_filepath) in file_ngrams {
+            for (other_ngram, other_filepath) in file_ngrams {
+                if let Some(bar) = &file_crosscheck_bar {
+                    bar.inc(1);
+                }
+
                 if ngram.nb_words() != other_ngram.nb_words() {
                     continue;
                 }
 
-                // TODO: This can be improved computationally using a hashmap
-                // Skip based on ignore_word_pairs
-                for (a, b) in &config.ignore_word_pairs {
-                    println!("{a} || {b}");
-                    if &ngram.to_string() == a && &other_ngram.to_string() == b {
-                        continue 'outer;
-                    }
-                    if &ngram.to_string() == b && &other_ngram.to_string() == a {
-                        continue 'outer;
-                    }
+                // Some guards to make it faster
+                if seen_ngrams.contains(&(ngram.clone(), other_ngram.clone())) {
+                    continue;
                 }
+                if seen_ngrams.contains(&(other_ngram.clone(), ngram.clone())) {
+                    continue;
+                }
+                seen_ngrams.insert((ngram.clone(), other_ngram.clone()));
+                seen_ngrams.insert((other_ngram.clone(), ngram.clone()));
 
-                if let Some(bar) = &file_crosscheck_bar {
-                    bar.inc(1);
+                // Handle ingnore_word_pairs
+                if ignore_word_pairs.contains(&(ngram.to_string(), other_ngram.to_string())) {
+                    continue;
+                }
+                if ignore_word_pairs.contains(&(other_ngram.to_string(), ngram.to_string())) {
+                    continue;
                 }
 
                 // Skip if the same file
@@ -206,7 +215,9 @@ impl SimilarFilename {
                 }
 
                 // Score the ngrams and check if they match
-                let score = matcher.fuzzy_match(&ngram.to_string(), &other_ngram.to_string());
+                let score1 = matcher.fuzzy_match(&ngram.to_string(), &other_ngram.to_string());
+                let score2 = matcher.fuzzy_match(&other_ngram.to_string(), &ngram.to_string());
+                let score = score1.max(score2);
                 if let Some(score) = score {
                     if score > filename_match_threshold {
                         matches.push(SimilarFilename::new(
@@ -259,9 +270,6 @@ impl SimilarFilename {
         let out1 = file1_is_prefix.is_match(&file2_str);
         let out2 = file2_is_prefix.is_match(&file1_str);
         let out = out1 || out2;
-        println!(
-            "({file1_str:?}, {file2_str:?}, {spacing_regex:?}) => ({out1} || {out2}) => {out}"
-        );
         Ok(out)
     }
 }

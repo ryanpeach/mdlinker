@@ -7,7 +7,7 @@ use crate::{
         content::wikilink::Alias,
         name::{Filename, FilenameLowercase},
     },
-    rules::{ErrorCode, IgnoreError, ReportTrait},
+    rules::{ErrorCode, ReportTrait},
     sed::{ReplacePair, ReplacePairCompilationError},
 };
 use bon::Builder;
@@ -143,9 +143,7 @@ fn combine_partials(
                 (_, Some(Err(e))) | (Some(Err(e)), _) => {
                     return Err(NewConfigError::ReplacePairCompilationError(e))
                 }
-                (None, None) => {
-                    unreachable!("There should always be a default, or at least empty strings...")
-                }
+                (None, None) => None,
             }
         })
         .maybe_alias_to_filename({
@@ -159,9 +157,7 @@ fn combine_partials(
                 (_, Some(Err(e))) | (Some(Err(e)), _) => {
                     return Err(NewConfigError::ReplacePairCompilationError(e))
                 }
-                (None, None) => {
-                    unreachable!("There should always be a default, or at least empty strings...")
-                }
+                (None, None) => None,
             }
         })
         .maybe_fix(cli_config.fix().or(file_config.fix()))
@@ -238,8 +234,8 @@ impl Config {
         out
     }
 
-    pub fn add_report_to_ignore(&mut self, report: impl ReportTrait) -> Result<(), IgnoreError> {
-        report.ignore(&mut self.file_config)
+    pub fn add_report_to_ignore(&mut self, report: &impl ReportTrait) {
+        report.ignore(&mut self.file_config);
     }
 
     pub fn save_config(&self) -> Result<(), SaveConfigError> {
