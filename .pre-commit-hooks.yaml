@@ -4,6 +4,8 @@
     entry: mdlinker
     language: rust
     pass_filenames: false
+    args:
+    - --allow-staged
 -   id: enforce-ascii
     name: Enforce ASCII Compliance
     description: Detects and replaces non-ASCII characters in specified files.

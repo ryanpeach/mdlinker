@@ -31,6 +31,8 @@ pub enum NewConfigError {
     #[error("Pages directory missing")]
     #[help("Please provide a pages directory argument in either your cli or config file")]
     PagesDirectoryMissing,
+    #[error("Mutually exclusive options: {0} and {1}")]
+    MutuallyExclusiveError(String, String),
 }
 
 /// Config which contains both the cli and the config file
@@ -71,6 +73,9 @@ pub struct Config {
     /// See [`self::cli::Config::allow_dirty`]
     #[builder(default = false)]
     pub allow_dirty: bool,
+    /// See [`self::cli::Config::allow_staged`]
+    #[builder(default = false)]
+    pub allow_staged: bool,
     /// See [`self::file::Config::ignore_word_pairs`]
     #[builder(default = vec![])]
     pub ignore_word_pairs: Vec<(String, String)>,
@@ -98,7 +103,8 @@ pub trait Partial {
         &self,
     ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairCompilationError>>;
     fn fix(&self) -> Option<bool>;
-    fn allow_dirty(&self) -> Option<bool>;
+    fn allow_dirty(&self) -> Result<Option<bool>, NewConfigError>;
+    fn allow_staged(&self) -> Result<Option<bool>, NewConfigError>;
     fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>>;
     fn ignore_remaining(&self) -> Option<bool>;
 }
@@ -161,7 +167,8 @@ fn combine_partials(
             }
         })
         .maybe_fix(cli_config.fix().or(file_config.fix()))
-        .maybe_allow_dirty(cli_config.allow_dirty().or(file_config.allow_dirty()))
+        .maybe_allow_dirty(cli_config.allow_dirty()?.or(file_config.allow_dirty()?))
+        .maybe_allow_staged(cli_config.allow_staged()?.or(file_config.allow_staged()?))
         .pages_directory(
             cli_config
                 .pages_directory()
