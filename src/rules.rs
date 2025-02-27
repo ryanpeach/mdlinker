@@ -95,6 +95,12 @@ pub enum FixError {
         #[backtrace]
         backtrace: Backtrace,
     },
+    #[error("The git repo has unstaged changes")]
+    #[help("Please stage your changes")]
+    UnstagedChanges {
+        #[backtrace]
+        backtrace: Backtrace,
+    },
     #[error("There was an error checking the git status: {source}")]
     GitError {
         source: git2::Error,
