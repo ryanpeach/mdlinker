@@ -69,6 +69,12 @@ def main():
         '–': '-',  # En-dash
         '—': '--', # Em-dash
         ' ': ' ',  # Non-breaking space
+        "😉": ";)",  # Winking face
+        "😩": ":(",  # Weary face
+        "â": "",
+        "€": "",
+        "™": "'",  # Example of a common encoding issue
+        "˜": "'",  # Example of a common encoding issue
     }
 
     # Add custom replacements to the map
