@@ -65,18 +65,17 @@ impl Config {
             std::fs::read_to_string(path).map_err(NewConfigError::FileDoesNotReadError)?;
         toml::from_str(&contents).map_err(NewConfigError::FileDoesNotParseError)
     }
+
+    #[must_use]
+    pub fn original_file_globs(&self) -> Option<Vec<String>> {
+        self.files.clone()
+    }
 }
 
 impl From<MasterConfig> for Config {
     fn from(value: MasterConfig) -> Self {
         Self {
-            files: Some(
-                value
-                    .files
-                    .into_iter()
-                    .map(|file| file.to_string_lossy().to_string())
-                    .collect(),
-            ),
+            files: value.original_file_globs,
             new_files_directory: Some(value.new_files_directory),
             ngram_size: Some(value.ngram_size),
             boundary_pattern: Some(value.boundary_pattern),
@@ -99,25 +98,17 @@ impl Partial for Config {
             Some(files) => {
                 for file in files {
                     if file.contains('*') {
-                        let pattern = glob::Pattern::new(file);
-                        match pattern {
-                            Ok(_) => {
-                                let globs = glob::glob(file);
-                                match globs {
-                                    Ok(globs) => {
-                                        for glob in globs {
-                                            match glob {
-                                                Ok(path) => out.push(path),
-                                                Err(e) => {
-                                                    eprintln!(
-                                                        "Error processing glob '{file}': {e}",
-                                                    );
-                                                }
-                                            }
+                        let globs = glob::glob(file);
+                        match globs {
+                            Ok(globs) => {
+                                for glob in globs {
+                                    match glob {
+                                        Ok(path) => {
+                                            out.push(path);
                                         }
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Error parsing glob pattern '{file}': {e}");
+                                        Err(e) => {
+                                            eprintln!("Error processing glob '{file}': {e}",);
+                                        }
                                     }
                                 }
                             }
@@ -126,11 +117,19 @@ impl Partial for Config {
                                 return None;
                             }
                         }
+                    } else {
+                        let path = PathBuf::from(file);
+                        if path.exists() {
+                            out.push(path);
+                        } else {
+                            eprintln!("File does not exist: {file}");
+                        }
                     }
                 }
             }
         }
         if out.is_empty() {
+            eprintln!("No valid files found in the configuration.");
             None
         } else {
             Some(out)

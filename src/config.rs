@@ -28,9 +28,8 @@ pub enum NewConfigError {
     FileDoesNotParseError(#[from] toml::de::Error),
     #[error("ReplacePair compilation error")]
     ReplacePairCompilationError(#[from] ReplacePairCompilationError),
-    #[error("Pages directory missing")]
-    #[help("Please provide a pages directory argument in either your cli or config file")]
-    PagesDirectoryMissing,
+    #[error("No files were passed to the config")]
+    NoFilesPassedError,
 }
 
 /// Config which contains both the cli and the config file
@@ -44,6 +43,7 @@ pub struct Config {
     /// See [`self::cli::Config::files`]
     #[builder(default=vec![])]
     pub files: Vec<PathBuf>,
+    pub original_file_globs: Option<Vec<String>>,
     /// See [`self::cli::Config::root_directory`]
     #[builder(default=PathBuf::from("."))]
     pub new_files_directory: PathBuf,
@@ -118,6 +118,19 @@ fn combine_partials(
     Ok(Config::builder()
         .file_config(file_config.clone())
         .cli_config(cli_config.clone())
+        .files({
+            let files = cli_config.files().or(file_config.files());
+            match files {
+                Some(files) if !files.is_empty() => files,
+                _ => return Err(NewConfigError::NoFilesPassedError),
+            }
+        })
+        .maybe_original_file_globs(file_config.original_file_globs())
+        .maybe_new_files_directory(
+            cli_config
+                .new_files_directory()
+                .or(file_config.new_files_directory()),
+        )
         .maybe_ngram_size(cli_config.ngram_size().or(file_config.ngram_size()))
         .maybe_boundary_pattern(
             cli_config
@@ -165,12 +178,6 @@ fn combine_partials(
         })
         .maybe_fix(cli_config.fix().or(file_config.fix()))
         .maybe_allow_dirty(cli_config.allow_dirty().or(file_config.allow_dirty()))
-        .files(
-            cli_config
-                .files()
-                .or(file_config.files())
-                .expect("A default is set"),
-        )
         .maybe_ignore_word_pairs(
             cli_config
                 .ignore_word_pairs()
