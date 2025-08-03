@@ -34,11 +34,11 @@ Put a `mdlinker.toml` in your project root to configure the linter.
 Options are defined in [`src/config/file.rs`](src/config/file.rs) as a serde object, and can be overwritten in the cli, see `mdlinker --help` and the docstrings for full details.
 
 ```toml
-# This is the folder where filenames which represent linkable words go.
-pages_directory = "pages"
+# These are any other files or folders you wish to scan.
+files = ["journal/foo.md", "notes/**/*.md"]
 
-# These are any other folders you wish to scan. These can't be linked to. Usually these are things which link to items in the pages_directory.
-other_directories = ["journal", "notes"]
+# This is the folder where new files will be created using --fix if there are any broken wikilinks.
+new_files_directory = "pages"
 
 # Exclusions
 # This is how you silence specific rules or instances of errors
