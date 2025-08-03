@@ -1,17 +1,17 @@
--   id: mdlinker
-    name: Markdown Linker
-    description: This hook checks that all markdown links are accounted for.
-    entry: mdlinker
-    language: rust
-    pass_filenames: false
--   id: enforce-ascii
-    name: Enforce ASCII Compliance
-    description: Detects and replaces non-ASCII characters in specified files.
-    entry: ./bin/enforce-ascii
-    language: script
-    types: [text]
-    pass_filenames: true
-    always_run: false
-    args:
+- id: mdlinker
+  name: Markdown Linker
+  description: This hook checks that all markdown links are accounted for.
+  entry: mdlinker
+  language: rust
+  pass_filenames: false
+- id: enforce-ascii
+  name: Enforce ASCII Compliance
+  description: Detects and replaces non-ASCII characters in specified files.
+  entry: ./bin/enforce-ascii
+  language: script
+  types: [text]
+  pass_filenames: true
+  always_run: false
+  args:
     - --fix
-    additional_dependencies: []
+  additional_dependencies: []

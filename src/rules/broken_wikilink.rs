@@ -57,7 +57,7 @@ impl ReportTrait for BrokenWikilink {
             self.src.name()
         );
         let filename = format!("{}.md", FilenameLowercase::from_alias(&self.alias, config));
-        let path = config.pages_directory.join(filename);
+        let path = config.new_files_directory.join(filename);
         std::fs::write(path.clone(), "").map_err(|source| FixError::IOError {
             source,
             backtrace: Backtrace::force_capture(),

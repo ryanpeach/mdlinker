@@ -58,7 +58,7 @@ pub trait Visitor {
     /// WARNING: Don't overwrite this, its already written for you.
     /// Implement [`Self::_finalize_file`] instead
     fn finalize_file(&mut self, source: &str, path: &Path) -> Result<(), FinalizeError> {
-        trace!("{:?} finalizing file {:?}", self.name(), path);
+        trace!("{:?} finalizing file {:?}", self.name(), path.display());
         #[allow(clippy::used_underscore_items)]
         self._finalize_file(source, path)
     }
@@ -118,7 +118,7 @@ pub enum ParseError {
 /// Parse the source code and visit all the nodes using tree-sitter
 #[allow(clippy::result_large_err)]
 pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<(), ParseError> {
-    debug!("Parsing file {:?}", path);
+    debug!("Parsing file {:?}", path.display());
     let source = std::fs::read_to_string(path).map_err(|source| ParseError::IoError {
         file: path.clone(),
         source,
