@@ -1,17 +1,19 @@
 use crate::common::get_report;
 use config::cli::Config as CliConfig;
 use config::file::Config as FileConfig;
-use lazy_static::lazy_static;
+use glob::glob;
 use log::info;
 use mdlinker::rules::similar_filename::SimilarFilename;
 use mdlinker::{config, lib};
 use regex::Regex;
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
-lazy_static! {
-    static ref PATHS: Vec<String> =
-        vec!["./tests/logseq/similar_filename/assets/pages".to_string(),];
-}
+static PATHS: std::sync::LazyLock<Vec<PathBuf>> = std::sync::LazyLock::new(|| {
+    glob("./tests/logseq/similar_filename/assets/pages/**/*.md")
+        .expect("This is a constant")
+        .map(|p| p.expect("This is a constant"))
+        .collect()
+});
 
 /// [`foo.md`](./assets/logseq/pages/foo.md) and [`foo___bar.md`](./assets/logseq/pages/foo___bar.md) should not conflict
 /// because the word `foo` in `foo/bar` is just a properly used group name.
@@ -19,10 +21,7 @@ lazy_static! {
 fn groups_first_element_same() {
     info!("groups_first_element_same");
     let config = config::Config::builder()
-        .pages_directory(
-            PathBuf::from_str("./tests/logseq/similar_filename/assets/pages")
-                .expect("This is a constant"),
-        )
+        .files(PATHS.to_vec())
         .file_config(FileConfig::default())
         .cli_config(CliConfig::default())
         .filename_match_threshold(1)
@@ -43,10 +42,7 @@ fn groups_first_element_same() {
 fn test_ignore_word_pairs1() {
     info!("test_ignore_word_pairs");
     let config = config::Config::builder()
-        .pages_directory(
-            PathBuf::from_str("./tests/logseq/similar_filename/assets/pages")
-                .expect("This is a constant"),
-        )
+        .files(PATHS.to_vec())
         .file_config(FileConfig::default())
         .cli_config(CliConfig::default())
         .filename_match_threshold(1)
@@ -68,10 +64,7 @@ fn test_ignore_word_pairs1() {
 fn test_ignore_word_pairs2() {
     info!("test_ignore_word_pairs");
     let config = config::Config::builder()
-        .pages_directory(
-            PathBuf::from_str("./tests/logseq/similar_filename/assets/pages")
-                .expect("This is a constant"),
-        )
+        .files(PATHS.to_vec())
         .file_config(FileConfig::default())
         .cli_config(CliConfig::default())
         .filename_match_threshold(1)

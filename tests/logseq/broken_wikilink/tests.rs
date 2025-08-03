@@ -1,18 +1,24 @@
-use lazy_static::lazy_static;
 use mdlinker::rules::broken_wikilink;
 
 use crate::common::get_report;
+use glob::glob;
 use log::{debug, info};
 use mdlinker::rules::filter_code;
+use std::path::PathBuf;
 
 use itertools::Itertools;
 
-lazy_static! {
-    static ref PATHS: Vec<String> = vec![
-        "./tests/logseq/broken_wikilink/assets/pages/".to_string(),
-        "./tests/logseq/broken_wikilink/assets/journals/".to_string()
-    ];
-}
+static PATHS: std::sync::LazyLock<Vec<PathBuf>> = std::sync::LazyLock::new(|| {
+    let first: Vec<PathBuf> = glob("./tests/logseq/broken_wikilink/assets/pages/**/*.md")
+        .expect("This is a constant")
+        .map(|p| p.expect("This is a constant"))
+        .collect();
+    let second: Vec<PathBuf> = glob("./tests/logseq/broken_wikilink/assets/journals/**/*.md")
+        .expect("This is a constant")
+        .map(|p| p.expect("This is a constant"))
+        .collect();
+    [first, second].concat()
+});
 
 #[test]
 fn number_of_broken_wikilinks() {
