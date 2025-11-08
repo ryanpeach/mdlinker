@@ -56,7 +56,7 @@ impl ReportTrait for UnlinkedText {
     /// TODO: Be able to handle this in parallel with other reports
     fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
         let file = self.src.name().to_owned();
-        trace!("Fixing unlinked text: {:?}", file);
+        trace!("Fixing unlinked text: {file:?}");
         let mut source = std::fs::read_to_string(&file).map_err(|src| FixError::IOError {
             source: src,
             file: file.clone(),

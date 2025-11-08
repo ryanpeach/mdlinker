@@ -8,7 +8,7 @@ pub mod sed;
 pub mod visitor;
 
 use console::{style, Emoji};
-use file::{get_files, name::ngrams};
+use file::name::ngrams;
 use indicatif::ProgressBar;
 use miette::{Diagnostic, Result};
 use ngrams::CalculateError;
@@ -137,6 +137,7 @@ impl RepoStatus {
 }
 
 /// Runs [`check`] in a loop until no more fixes can be made
+#[allow(clippy::result_large_err)]
 fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     // Check if the git repo is dirty
     match git2::Repository::open_from_env() {
@@ -176,7 +177,7 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             style("[1/3]").bold().dim(),
             CHECK
         );
-    };
+    }
 
     let mut output_report = check(config)?;
 
@@ -222,7 +223,7 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
                 style("[3/3]").bold().dim(),
                 CHECK_AGAIN
             );
-        };
+        }
         output_report = check(config)?;
     } else if env::var("RUNNING_TESTS").is_err() {
         println!(
@@ -235,12 +236,13 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     Ok(output_report)
 }
 
+#[allow(clippy::result_large_err)]
 fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     // Compile our regex patterns
     let boundary_regex = regex::Regex::new(&config.boundary_pattern)?;
     let filename_spacing_regex = regex::Regex::new(&config.filename_spacing_pattern)?;
 
-    let all_files = get_files(&config.directories());
+    let all_files = config.files().to_vec();
     let file_ngrams = ngrams(
         &all_files,
         config.ngram_size,
@@ -360,6 +362,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
 ///
 /// Basically if this library fails, this returns an Err
 /// but if this library runs, even if it finds linting violations, this returns an Ok
+#[allow(clippy::result_large_err)]
 pub fn lib(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     if config.fix {
         fix(config)

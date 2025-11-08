@@ -33,19 +33,25 @@ pub enum NewConfigError {
     PagesDirectoryMissing,
     #[error("Mutually exclusive options: {0} and {1}")]
     MutuallyExclusiveError(String, String),
+    #[error("No files were passed to the config")]
+    NoFilesPassedError,
 }
 
 /// Config which contains both the cli and the config file
 /// Used to reconcile the two
 #[derive(Builder)]
 pub struct Config {
+    #[allow(clippy::struct_field_names)]
     file_config: file::Config,
+    #[allow(clippy::struct_field_names)]
     cli_config: cli::Config,
-    /// See [`self::cli::Config::pages_directory`]
-    pub pages_directory: PathBuf,
-    /// See [`self::cli::Config::other_directories`]
+    /// See [`self::cli::Config::files`]
     #[builder(default=vec![])]
-    pub other_directories: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
+    pub original_file_globs: Option<Vec<String>>,
+    /// See [`self::cli::Config::root_directory`]
+    #[builder(default=PathBuf::from("."))]
+    pub new_files_directory: PathBuf,
     /// See [`self::cli::Config::ngram_size`]
     #[builder(default = 2)]
     pub ngram_size: usize,
@@ -89,8 +95,8 @@ pub struct Config {
 /// these can be unioned with one another
 /// and then we can use that to create the final config
 pub trait Partial {
-    fn pages_directory(&self) -> Option<PathBuf>;
-    fn other_directories(&self) -> Option<Vec<PathBuf>>;
+    fn files(&self) -> Option<Vec<PathBuf>>;
+    fn new_files_directory(&self) -> Option<PathBuf>;
     fn ngram_size(&self) -> Option<usize>;
     fn boundary_pattern(&self) -> Option<String>;
     fn filename_spacing_pattern(&self) -> Option<String>;
@@ -121,6 +127,19 @@ fn combine_partials(
     Ok(Config::builder()
         .file_config(file_config.clone())
         .cli_config(cli_config.clone())
+        .files({
+            let files = cli_config.files().or(file_config.files());
+            match files {
+                Some(files) if !files.is_empty() => files,
+                _ => return Err(NewConfigError::NoFilesPassedError),
+            }
+        })
+        .maybe_original_file_globs(file_config.original_file_globs())
+        .maybe_new_files_directory(
+            cli_config
+                .new_files_directory()
+                .or(file_config.new_files_directory()),
+        )
         .maybe_ngram_size(cli_config.ngram_size().or(file_config.ngram_size()))
         .maybe_boundary_pattern(
             cli_config
@@ -169,18 +188,6 @@ fn combine_partials(
         .maybe_fix(cli_config.fix().or(file_config.fix()))
         .maybe_allow_dirty(cli_config.allow_dirty()?.or(file_config.allow_dirty()?))
         .maybe_allow_staged(cli_config.allow_staged()?.or(file_config.allow_staged()?))
-        .pages_directory(
-            cli_config
-                .pages_directory()
-                .or(file_config.pages_directory())
-                .expect("A default is set"),
-        )
-        .maybe_other_directories(Some(
-            cli_config
-                .other_directories()
-                .or(file_config.other_directories())
-                .expect("A default is set"),
-        ))
         .maybe_ignore_word_pairs(
             cli_config
                 .ignore_word_pairs()
@@ -199,9 +206,9 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// - [`Error::FileDoesNotExistError`] - Config file does not exist
-    /// - [`Error::FileDoesNotParseError`] - Config file does not parse from toml into the
-    ///     expected format
+    ///  - [`Error::FileDoesNotExistError`] - Config file does not exist
+    ///  - [`Error::FileDoesNotParseError`] - Config file does not parse from toml into the
+    ///    expected format
     ///
     pub fn new() -> Result<Self, NewConfigError> {
         let cli = cli::Config::parse();
@@ -234,11 +241,8 @@ impl Config {
     /// Legacy directories function
     /// Gets all the directories into one vec
     #[must_use]
-    pub fn directories(&self) -> Vec<PathBuf> {
-        let mut out = Vec::new();
-        out.push(self.pages_directory.clone());
-        out.extend(self.other_directories.clone());
-        out
+    pub fn files(&self) -> &[PathBuf] {
+        &self.files
     }
 
     pub fn add_report_to_ignore(&mut self, report: &impl ReportTrait) {

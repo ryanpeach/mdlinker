@@ -80,7 +80,6 @@ fn dedupe_by_code<T: ReportTrait + PartialOrd>(mut this: Vec<T>) -> Vec<T> {
 
 /// Used for filtering out items that start with the exclude code
 impl<T: ReportTrait + PartialOrd> VecHasIdExtensions<T> for Vec<T> {
-    #[must_use]
     fn finalize(self, excludes: &[ErrorCode]) -> Self {
         dedupe_by_code(filter_by_excludes(self, excludes))
     }

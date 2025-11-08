@@ -16,14 +16,14 @@ use super::Partial;
 #[derive(Parser, Default, Clone)]
 #[command(version, about, long_about = None)]
 pub struct Config {
-    /// The pages directory is the directory where pages are named for their alias
-    /// and where new pages should be created when running --fix
-    #[clap(short = 'p', long = "pages")]
-    pub pages_directory: Option<PathBuf>,
+    /// Globs or paths to relevant files
+    #[clap()]
+    pub files: Vec<PathBuf>,
 
-    /// Other directories to search in
-    #[clap(short = 'd', long = "dir")]
-    pub other_directories: Vec<PathBuf>,
+    /// A location to store new files in created by --fix
+    /// for the [`super::rules::broken_wikilink::BrokenWikilink`] rule
+    #[clap(short = 'n', long = "newf")]
+    pub new_files_directory: Option<PathBuf>,
 
     /// Path to a configuration file
     #[clap(short = 'c', long = "config", default_value = "mdlinker.toml")]
@@ -77,16 +77,15 @@ pub struct Config {
 }
 
 impl Partial for Config {
-    fn pages_directory(&self) -> Option<PathBuf> {
-        self.pages_directory.clone()
-    }
-    fn other_directories(&self) -> Option<Vec<PathBuf>> {
-        let out = self.other_directories.clone();
-        if out.is_empty() {
+    fn files(&self) -> Option<Vec<PathBuf>> {
+        if self.files.is_empty() {
             None
         } else {
-            Some(out)
+            Some(self.files.clone())
         }
+    }
+    fn new_files_directory(&self) -> Option<PathBuf> {
+        self.new_files_directory.clone()
     }
     fn ngram_size(&self) -> Option<usize> {
         self.ngram_size

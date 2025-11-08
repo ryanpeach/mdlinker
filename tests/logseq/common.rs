@@ -1,5 +1,5 @@
 //! Code used in multiple test folders
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use mdlinker::{
     config::{cli::Config as CliConfig, file::Config as FileConfig, Config},
@@ -19,21 +19,14 @@ fn setup() {
 
 /// Runs the library and generates the [`mdlinker::OutputReport`]
 #[must_use]
-pub fn get_report(paths: &[String], config: Option<Config>) -> mdlinker::OutputReport {
+pub fn get_report(paths: &[PathBuf], config: Option<Config>) -> mdlinker::OutputReport {
     setup();
     let config: Config = match config {
-        None => {
-            let paths: Vec<PathBuf> = paths
-                .iter()
-                .map(|path| PathBuf::from_str(path).expect("This path exists at compile time."))
-                .collect();
-            Config::builder()
-                .pages_directory(paths[0].clone())
-                .other_directories(paths[1..].to_vec())
-                .cli_config(CliConfig::default())
-                .file_config(FileConfig::default())
-                .build()
-        }
+        None => Config::builder()
+            .files(paths.to_vec())
+            .cli_config(CliConfig::default())
+            .file_config(FileConfig::default())
+            .build(),
         Some(config) => config,
     };
 

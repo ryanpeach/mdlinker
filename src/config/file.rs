@@ -15,11 +15,13 @@ use super::{Config as MasterConfig, NewConfigError, Partial};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Config {
-    /// See [`super::cli::Config::pages_directory`]
-    pub pages_directory: PathBuf,
+    /// See [`super::cli::Config::files`]
+    #[serde(default)]
+    pub files: Option<Vec<String>>,
 
-    /// See [`super::cli::Config::other_directories`]
-    pub other_directories: Vec<PathBuf>,
+    /// See [`super::cli::Config::new_files_directory`]
+    #[serde(default)]
+    pub new_files_directory: Option<PathBuf>,
 
     /// See [`super::cli::Config::ngram_size`]
     #[serde(default)]
@@ -63,13 +65,18 @@ impl Config {
             std::fs::read_to_string(path).map_err(NewConfigError::FileDoesNotReadError)?;
         toml::from_str(&contents).map_err(NewConfigError::FileDoesNotParseError)
     }
+
+    #[must_use]
+    pub fn original_file_globs(&self) -> Option<Vec<String>> {
+        self.files.clone()
+    }
 }
 
 impl From<MasterConfig> for Config {
     fn from(value: MasterConfig) -> Self {
         Self {
-            pages_directory: value.pages_directory,
-            other_directories: value.other_directories,
+            files: value.original_file_globs,
+            new_files_directory: Some(value.new_files_directory),
             ngram_size: Some(value.ngram_size),
             boundary_pattern: Some(value.boundary_pattern),
             filename_spacing_pattern: Some(value.filename_spacing_pattern),
@@ -83,16 +90,54 @@ impl From<MasterConfig> for Config {
 }
 
 impl Partial for Config {
-    fn pages_directory(&self) -> Option<PathBuf> {
-        Some(self.pages_directory.clone())
-    }
-    fn other_directories(&self) -> Option<Vec<PathBuf>> {
-        let out = self.other_directories.clone();
+    fn files(&self) -> Option<Vec<PathBuf>> {
+        let mut out = Vec::new();
+        match &self.files {
+            None => return None,
+            Some(files) if files.is_empty() => return None,
+            Some(files) => {
+                for file in files {
+                    if file.contains('*') {
+                        let globs = glob::glob(file);
+                        match globs {
+                            Ok(globs) => {
+                                for glob in globs {
+                                    match glob {
+                                        Ok(path) => {
+                                            out.push(path);
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Error processing glob '{file}': {e}",);
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Error parsing glob pattern '{file}': {e}");
+                                return None;
+                            }
+                        }
+                    } else {
+                        let path = PathBuf::from(file);
+                        if path.exists() {
+                            out.push(path);
+                        } else {
+                            eprintln!("File does not exist: {file}");
+                        }
+                    }
+                }
+            }
+        }
         if out.is_empty() {
+            eprintln!("No valid files found in the configuration.");
             None
         } else {
             Some(out)
         }
+    }
+
+    fn new_files_directory(&self) -> Option<PathBuf> {
+        self.new_files_directory.clone()
     }
 
     fn ngram_size(&self) -> Option<usize> {
