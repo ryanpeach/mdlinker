@@ -2,6 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 use crate::{
+    config::NewConfigError,
     file::{
         content::wikilink::Alias,
         name::{Filename, FilenameLowercase},
@@ -57,9 +58,18 @@ pub struct Config {
     pub fix: bool,
 
     /// Whether or not to allow fixing in a "dirty" git repo, meaning
-    /// the git repo has uncommitted changes
+    /// the git repo has uncommitted changes and those changes will be overwritten by this apps
+    /// changes without user involvement. WARNING: Dangerous
+    /// Mutually exclusive with --allow-staged
     #[clap(long = "allow-dirty")]
     pub allow_dirty: bool,
+
+    /// Whether or not to allow fixing in a "dirty" git repo where everything is "staged", meaning
+    /// the git repo has uncommitted changes, but they still won't be changed by edits unless the
+    /// user stages the changes.
+    /// Mutually exclusive with --allow-dirty
+    #[clap(long = "allow-staged")]
+    pub allow_staged: bool,
 
     /// Ignore remaining errors by adding them to the config
     #[clap(long = "ignore-remaining")]
@@ -110,8 +120,25 @@ impl Partial for Config {
     fn fix(&self) -> Option<bool> {
         Some(self.fix)
     }
-    fn allow_dirty(&self) -> Option<bool> {
-        Some(self.allow_dirty)
+    fn allow_dirty(&self) -> Result<Option<bool>, NewConfigError> {
+        if self.allow_staged && self.allow_dirty {
+            Err(NewConfigError::MutuallyExclusiveError(
+                "allow_staged".to_string(),
+                "allow_dirty".to_string(),
+            ))
+        } else {
+            Ok(Some(self.allow_dirty))
+        }
+    }
+    fn allow_staged(&self) -> Result<Option<bool>, NewConfigError> {
+        if self.allow_staged && self.allow_dirty {
+            Err(NewConfigError::MutuallyExclusiveError(
+                "allow_staged".to_string(),
+                "allow_dirty".to_string(),
+            ))
+        } else {
+            Ok(Some(self.allow_staged))
+        }
     }
     fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>> {
         None

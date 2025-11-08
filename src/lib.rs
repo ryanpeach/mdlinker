@@ -100,17 +100,40 @@ pub enum OutputErrors {
 
 use git2::{Error, Repository, StatusOptions};
 
-fn is_repo_dirty(repo: &Repository) -> Result<bool, Error> {
-    let mut options = StatusOptions::new();
-    options
-        .include_untracked(true)
-        .recurse_untracked_dirs(true)
-        .exclude_submodules(true)
-        .include_unmodified(false)
-        .include_ignored(false);
+pub enum RepoStatus {
+    Clean,
+    AllStaged,
+    Dirty,
+}
 
-    let statuses = repo.statuses(Some(&mut options))?;
-    Ok(!statuses.is_empty())
+impl RepoStatus {
+    fn get_repo_status(repo: &Repository) -> Result<RepoStatus, Error> {
+        let mut options = StatusOptions::new();
+        options
+            .include_untracked(true)
+            .recurse_untracked_dirs(true)
+            .exclude_submodules(true)
+            .include_unmodified(false)
+            .include_ignored(false);
+
+        let statuses = repo.statuses(Some(&mut options))?;
+        let mut staged = false;
+        let mut dirty = false;
+        for entry in statuses.iter() {
+            let status = entry.status();
+            if status.is_wt_new() || status.is_wt_modified() || status.is_wt_deleted() {
+                dirty = true;
+            }
+            if status.is_index_new() || status.is_index_modified() || status.is_index_deleted() {
+                staged = true;
+            }
+        }
+        match (dirty, staged) {
+            (true, true) => Ok(RepoStatus::AllStaged),
+            (true, false) => Ok(RepoStatus::Dirty),
+            (false, _) => Ok(RepoStatus::Clean),
+        }
+    }
 }
 
 /// Runs [`check`] in a loop until no more fixes can be made
@@ -118,20 +141,28 @@ fn is_repo_dirty(repo: &Repository) -> Result<bool, Error> {
 fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     // Check if the git repo is dirty
     match git2::Repository::open_from_env() {
-        Ok(git) => match is_repo_dirty(&git) {
-            Ok(is_dirty) => {
-                if !config.allow_dirty && is_dirty {
-                    return Err(OutputErrors::FixError(rules::FixError::DirtyRepo {
-                        backtrace: Backtrace::force_capture(),
-                    }));
-                }
+        Ok(git) => match (
+            RepoStatus::get_repo_status(&git),
+            config.allow_dirty,
+            config.allow_staged,
+        ) {
+            (Ok(RepoStatus::Dirty), false, _) => {
+                return Err(OutputErrors::FixError(rules::FixError::DirtyRepo {
+                    backtrace: Backtrace::force_capture(),
+                }));
             }
-            Err(e) => {
+            (Ok(RepoStatus::AllStaged), _, false) => {
+                return Err(OutputErrors::FixError(rules::FixError::UnstagedChanges {
+                    backtrace: Backtrace::force_capture(),
+                }));
+            }
+            (Err(e), _, _) => {
                 return Err(OutputErrors::FixError(rules::FixError::GitError {
                     source: e,
                     backtrace: Backtrace::force_capture(),
                 }));
             }
+            _ => {}
         },
         Err(e) => {
             return Err(OutputErrors::FixError(rules::FixError::GitError {

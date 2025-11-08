@@ -199,8 +199,11 @@ impl Partial for Config {
     fn fix(&self) -> Option<bool> {
         None
     }
-    fn allow_dirty(&self) -> Option<bool> {
-        None
+    fn allow_dirty(&self) -> Result<Option<bool>, NewConfigError> {
+        Ok(None)
+    }
+    fn allow_staged(&self) -> Result<Option<bool>, NewConfigError> {
+        Ok(None)
     }
     fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>> {
         if self.ignore_word_pairs.is_empty() {
