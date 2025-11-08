@@ -21,8 +21,7 @@ use miette::{Diagnostic, NamedSource, Result, SourceSpan};
 use thiserror::Error;
 
 use super::{
-    dedupe_by_code, filter_by_excludes, ErrorCode, FixError, HasId, Report, ReportTrait,
-    ThirdPassReport,
+    dedupe_by_code, filter_by_excludes, ErrorCode, FixError, Report, ReportTrait, ThirdPassReport,
 };
 
 pub const CODE: &str = "content::wikilink::broken";
@@ -47,6 +46,9 @@ pub struct BrokenWikilink {
 }
 
 impl ReportTrait for BrokenWikilink {
+    fn id(&self) -> ErrorCode {
+        self.id.clone()
+    }
     /// Create a new file called the text under the span
     fn fix(&self, config: &Config) -> Result<Option<()>, FixError> {
         trace!(
@@ -55,7 +57,7 @@ impl ReportTrait for BrokenWikilink {
             self.src.name()
         );
         let filename = format!("{}.md", FilenameLowercase::from_alias(&self.alias, config));
-        let path = config.pages_directory.join(filename);
+        let path = config.new_files_directory.join(filename);
         std::fs::write(path.clone(), "").map_err(|source| FixError::IOError {
             source,
             backtrace: Backtrace::force_capture(),
@@ -74,12 +76,6 @@ impl PartialEq for BrokenWikilink {
 impl PartialOrd for BrokenWikilink {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.id.partial_cmp(&other.id)
-    }
-}
-
-impl HasId for BrokenWikilink {
-    fn id(&self) -> ErrorCode {
-        self.id.clone()
     }
 }
 

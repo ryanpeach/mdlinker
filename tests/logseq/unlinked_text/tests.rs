@@ -1,27 +1,33 @@
 use std::fs;
 
-use lazy_static::lazy_static;
 use mdlinker::rules::unlinked_text;
 
+use glob::glob;
 use log::{debug, info};
 use mdlinker::rules::filter_code;
 use miette::SourceOffset;
+use std::path::PathBuf;
 
 use crate::common::get_report;
 
 use itertools::Itertools;
 
-lazy_static! {
-    static ref PATHS: Vec<String> = vec![
-        "./tests/logseq/unlinked_text/assets/pages/".to_string(),
-        "./tests/logseq/unlinked_text/assets/journals/".to_string()
-    ];
-}
+static PATHS: std::sync::LazyLock<Vec<PathBuf>> = std::sync::LazyLock::new(|| {
+    let first: Vec<PathBuf> = glob("./tests/logseq/unlinked_text/assets/pages/**/*.md")
+        .expect("This is a constant")
+        .map(|p| p.expect("This is a constant"))
+        .collect();
+    let second: Vec<PathBuf> = glob("./tests/logseq/unlinked_text/assets/journals/**/*.md")
+        .expect("This is a constant")
+        .map(|p| p.expect("This is a constant"))
+        .collect();
+    [first, second].concat()
+});
 
 #[test]
 fn number_of_unlinked_texts() {
     info!("number_of_unlinked_texts");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for unlinked_texts in &report.unlinked_texts() {
         debug!("{unlinked_texts:#?}");
     }
@@ -32,7 +38,7 @@ fn number_of_unlinked_texts() {
 #[test]
 fn lorem_exist_and_is_wikilink() {
     info!("lorem_exist_and_is_wikilink");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for unlinked_text in &report.unlinked_texts() {
         debug!("{unlinked_text:#?}");
     }
@@ -47,7 +53,7 @@ fn lorem_exist_and_is_wikilink() {
 #[test]
 fn ipsum_is_alias_and_is_not_wikilink_in_journal() {
     info!("ipsum_is_alias_and_is_not_wikilink_in_journal");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for unlinked_text in &report.unlinked_texts() {
         debug!("{unlinked_text:#?}");
     }
@@ -61,7 +67,7 @@ fn ipsum_is_alias_and_is_not_wikilink_in_journal() {
 #[test]
 fn dolors_exists_and_is_not_wikilink_in_foo() {
     info!("dolors_exists_and_is_not_wikilink_in_foo");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     for unlinked_text in &report.unlinked_texts() {
         debug!("{unlinked_text:#?}");
     }
@@ -75,7 +81,7 @@ fn dolors_exists_and_is_not_wikilink_in_foo() {
 #[test]
 fn dolors_exists_and_is_not_wikilink_in_foo_span() {
     info!("dolors_exists_and_is_not_wikilink_in_foo_span");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     let err_list = filter_code(
         report.unlinked_texts(),
         &format!("{}::foo::dolors", unlinked_text::CODE).into(),
@@ -89,7 +95,7 @@ fn dolors_exists_and_is_not_wikilink_in_foo_span() {
 #[test]
 fn icazyvey_exists_and_is_not_wikilink_in_journal() {
     info!("icazyvey_exists_and_is_not_wikilink_in_journal");
-    let report = get_report(PATHS.as_slice());
+    let report = get_report(PATHS.as_slice(), None);
     let err_list = filter_code(
         report.unlinked_texts(),
         &format!("{}::2024_08_10::icazyvey", unlinked_text::CODE).into(),

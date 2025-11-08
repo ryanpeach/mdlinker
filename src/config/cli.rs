@@ -2,6 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 use crate::{
+    config::NewConfigError,
     file::{
         content::wikilink::Alias,
         name::{Filename, FilenameLowercase},
@@ -12,17 +13,17 @@ use crate::{
 
 use super::Partial;
 
-#[derive(Parser, Default)]
+#[derive(Parser, Default, Clone)]
 #[command(version, about, long_about = None)]
-pub(super) struct Config {
-    /// The pages directory is the directory where pages are named for their alias
-    /// and where new pages should be created when running --fix
-    #[clap(short = 'p', long = "pages")]
-    pub pages_directory: Option<PathBuf>,
+pub struct Config {
+    /// Globs or paths to relevant files
+    #[clap()]
+    pub files: Vec<PathBuf>,
 
-    /// Other directories to search in
-    #[clap(short = 'd', long = "dir")]
-    pub other_directories: Vec<PathBuf>,
+    /// A location to store new files in created by --fix
+    /// for the [`super::rules::broken_wikilink::BrokenWikilink`] rule
+    #[clap(short = 'n', long = "newf")]
+    pub new_files_directory: Option<PathBuf>,
 
     /// Path to a configuration file
     #[clap(short = 'c', long = "config", default_value = "mdlinker.toml")]
@@ -57,22 +58,34 @@ pub(super) struct Config {
     pub fix: bool,
 
     /// Whether or not to allow fixing in a "dirty" git repo, meaning
-    /// the git repo has uncommitted changes
+    /// the git repo has uncommitted changes and those changes will be overwritten by this apps
+    /// changes without user involvement. WARNING: Dangerous
+    /// Mutually exclusive with --allow-staged
     #[clap(long = "allow-dirty")]
     pub allow_dirty: bool,
+
+    /// Whether or not to allow fixing in a "dirty" git repo where everything is "staged", meaning
+    /// the git repo has uncommitted changes, but they still won't be changed by edits unless the
+    /// user stages the changes.
+    /// Mutually exclusive with --allow-dirty
+    #[clap(long = "allow-staged")]
+    pub allow_staged: bool,
+
+    /// Ignore remaining errors by adding them to the config
+    #[clap(long = "ignore-remaining")]
+    pub ignore_remaining: bool,
 }
 
 impl Partial for Config {
-    fn pages_directory(&self) -> Option<PathBuf> {
-        self.pages_directory.clone()
-    }
-    fn other_directories(&self) -> Option<Vec<PathBuf>> {
-        let out = self.other_directories.clone();
-        if out.is_empty() {
+    fn files(&self) -> Option<Vec<PathBuf>> {
+        if self.files.is_empty() {
             None
         } else {
-            Some(out)
+            Some(self.files.clone())
         }
+    }
+    fn new_files_directory(&self) -> Option<PathBuf> {
+        self.new_files_directory.clone()
     }
     fn ngram_size(&self) -> Option<usize> {
         self.ngram_size
@@ -107,7 +120,30 @@ impl Partial for Config {
     fn fix(&self) -> Option<bool> {
         Some(self.fix)
     }
-    fn allow_dirty(&self) -> Option<bool> {
-        Some(self.allow_dirty)
+    fn allow_dirty(&self) -> Result<Option<bool>, NewConfigError> {
+        if self.allow_staged && self.allow_dirty {
+            Err(NewConfigError::MutuallyExclusiveError(
+                "allow_staged".to_string(),
+                "allow_dirty".to_string(),
+            ))
+        } else {
+            Ok(Some(self.allow_dirty))
+        }
+    }
+    fn allow_staged(&self) -> Result<Option<bool>, NewConfigError> {
+        if self.allow_staged && self.allow_dirty {
+            Err(NewConfigError::MutuallyExclusiveError(
+                "allow_staged".to_string(),
+                "allow_dirty".to_string(),
+            ))
+        } else {
+            Ok(Some(self.allow_staged))
+        }
+    }
+    fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>> {
+        None
+    }
+    fn ignore_remaining(&self) -> Option<bool> {
+        Some(self.ignore_remaining)
     }
 }

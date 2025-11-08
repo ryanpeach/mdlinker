@@ -1,15 +1,16 @@
 use crate::{
-    config::Config,
+    config::{file::Config as FileConfig, Config},
     file::name::get_filename,
-    ngrams::{MissingSubstringError, Ngram},
-    rules::HasId,
+    ngrams::{CalculateError, Ngram},
 };
+use console::{style, Emoji};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use indicatif::ProgressBar;
 use miette::{Diagnostic, SourceOffset, SourceSpan};
 use regex::Regex;
+use std::backtrace::Backtrace;
 use std::{
     env,
     path::{Path, PathBuf},
@@ -20,12 +21,16 @@ use super::{ErrorCode, FixError, ReportTrait};
 
 pub const CODE: &str = "name::similar";
 
+static SIMILAR: Emoji<'_, '_> = Emoji("🤝  ", "");
+
 #[derive(Error, Debug, Diagnostic, Clone)]
 #[error("Filenames are similar")]
 #[diagnostic(code("name::similar"))]
 pub struct SimilarFilename {
     /// Used to identify the diagnostic and exclude it if needed
     id: ErrorCode,
+    file1_ngram: Ngram,
+    file2_ngram: Ngram,
 
     score: i64,
 
@@ -33,17 +38,25 @@ pub struct SimilarFilename {
     filepaths: String,
 
     #[label("This bit here")]
-    file1_ngram: SourceSpan,
+    file1_ngram_span: SourceSpan,
 
     #[label("That bit there")]
-    file2_ngram: SourceSpan,
+    file2_ngram_span: SourceSpan,
 
     #[help]
     advice: String,
 }
 impl ReportTrait for SimilarFilename {
+    fn id(&self) -> ErrorCode {
+        self.id.clone()
+    }
     fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
         Ok(None)
+    }
+    fn ignore(&self, config: &mut FileConfig) {
+        config
+            .ignore_word_pairs
+            .push((self.file1_ngram.to_string(), self.file2_ngram.to_string()));
     }
 }
 
@@ -59,12 +72,6 @@ impl PartialEq for SimilarFilename {
     }
 }
 
-impl HasId for SimilarFilename {
-    fn id(&self) -> ErrorCode {
-        self.id.clone()
-    }
-}
-
 impl SimilarFilename {
     /// Create a new diagnostic
     /// based on the two filenames and their similar ngrams
@@ -76,7 +83,7 @@ impl SimilarFilename {
         file2_ngram: &Ngram,
         spacing_regex: &Regex,
         score: i64,
-    ) -> Result<Self, MissingSubstringError> {
+    ) -> Result<Self, CalculateError> {
         // file paths as strings
         let file1 = file1_path.to_string_lossy().to_lowercase();
         let file2 = file2_path.to_string_lossy().to_lowercase();
@@ -89,7 +96,7 @@ impl SimilarFilename {
         let find1 = spacing_regex
             .replace_all(&file1, " ")
             .find(&file1_ngram.to_string())
-            .ok_or_else(|| MissingSubstringError {
+            .ok_or_else(|| CalculateError::MissingSubstringError {
                 path: file1_path.to_path_buf(),
                 ngram: file1_ngram.to_string(),
                 backtrace: std::backtrace::Backtrace::capture(),
@@ -97,18 +104,18 @@ impl SimilarFilename {
         let find2 = spacing_regex
             .replace_all(&file2, " ")
             .find(&file2_ngram.to_string())
-            .ok_or_else(|| MissingSubstringError {
+            .ok_or_else(|| CalculateError::MissingSubstringError {
                 path: file2_path.to_path_buf(),
                 ngram: file2_ngram.to_string(),
                 backtrace: std::backtrace::Backtrace::capture(),
             })?;
 
         // Create the spans
-        let file1_ngram = SourceSpan::new(
+        let file1_ngram_span = SourceSpan::new(
             SourceOffset::from_location(&source, 1, find1 + 1),
             file1_ngram.len(),
         );
-        let file2_ngram = SourceSpan::new(
+        let file2_ngram_span = SourceSpan::new(
             SourceOffset::from_location(&source, 2, find2 + 1),
             file2_ngram.len(),
         );
@@ -133,9 +140,11 @@ impl SimilarFilename {
             id: id.into(),
             score,
             filepaths,
-            file1_ngram,
-            file2_ngram,
+            file1_ngram_span,
+            file2_ngram_span,
             advice,
+            file1_ngram: file1_ngram.clone(),
+            file2_ngram: file2_ngram.clone(),
         })
     }
 
@@ -143,7 +152,8 @@ impl SimilarFilename {
         file_ngrams: &HashMap<Ngram, PathBuf>,
         filename_match_threshold: i64,
         spacing_regex: &Regex,
-    ) -> Result<Vec<SimilarFilename>, MissingSubstringError> {
+        config: &Config,
+    ) -> Result<Vec<SimilarFilename>, CalculateError> {
         // Convert all filenames to a single string
         // Check if any two file ngrams fuzzy match
         // TODO: Unfortunately this is O(n^2)
@@ -152,20 +162,46 @@ impl SimilarFilename {
         let file_crosscheck_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
             None
         } else {
+            println!(
+                "  {} {}Searching for Similar Filenames O(n^2)...",
+                style("[1/3]").bold().dim(),
+                SIMILAR
+            );
             #[allow(clippy::cast_sign_loss)]
             #[allow(clippy::cast_possible_truncation)]
-            Some(ProgressBar::new((n * (n + 1.0) / 2.0) as u64).with_prefix("Crosschecking files"))
+            Some(ProgressBar::new((n * n) as u64))
         };
         let matcher = SkimMatcherV2::default();
         let mut matches: Vec<SimilarFilename> = Vec::new();
+        let mut seen_ngrams = HashSet::<(Ngram, Ngram)>::new();
+        let ignore_word_pairs: HashSet<(String, String)> =
+            config.ignore_word_pairs.iter().cloned().collect();
         for (ngram, filepath) in file_ngrams {
             for (other_ngram, other_filepath) in file_ngrams {
+                if let Some(bar) = &file_crosscheck_bar {
+                    bar.inc(1);
+                }
+
                 if ngram.nb_words() != other_ngram.nb_words() {
                     continue;
                 }
 
-                if let Some(bar) = &file_crosscheck_bar {
-                    bar.inc(1);
+                // Some guards to make it faster
+                if seen_ngrams.contains(&(ngram.clone(), other_ngram.clone())) {
+                    continue;
+                }
+                if seen_ngrams.contains(&(other_ngram.clone(), ngram.clone())) {
+                    continue;
+                }
+                seen_ngrams.insert((ngram.clone(), other_ngram.clone()));
+                seen_ngrams.insert((other_ngram.clone(), ngram.clone()));
+
+                // Handle ingnore_word_pairs
+                if ignore_word_pairs.contains(&(ngram.to_string(), other_ngram.to_string())) {
+                    continue;
+                }
+                if ignore_word_pairs.contains(&(other_ngram.to_string(), ngram.to_string())) {
+                    continue;
                 }
 
                 // Skip if the same file
@@ -174,12 +210,14 @@ impl SimilarFilename {
                 }
 
                 // Each editor will have its own special cases, lets centralize them
-                if SimilarFilename::skip_special_cases(filepath, other_filepath) {
+                if SimilarFilename::skip_special_cases(filepath, other_filepath, spacing_regex)? {
                     continue;
                 }
 
                 // Score the ngrams and check if they match
-                let score = matcher.fuzzy_match(&ngram.to_string(), &other_ngram.to_string());
+                let score1 = matcher.fuzzy_match(&ngram.to_string(), &other_ngram.to_string());
+                let score2 = matcher.fuzzy_match(&other_ngram.to_string(), &ngram.to_string());
+                let score = score1.max(score2);
                 if let Some(score) = score {
                     if score > filename_match_threshold {
                         matches.push(SimilarFilename::new(
@@ -196,7 +234,7 @@ impl SimilarFilename {
             }
         }
         if let Some(bar) = file_crosscheck_bar {
-            bar.finish();
+            bar.finish_and_clear();
         }
         Ok(matches)
     }
@@ -204,17 +242,34 @@ impl SimilarFilename {
 
 /// Each editor will have its own special cases, lets centralize them
 impl SimilarFilename {
-    /// Centralize the special cases for skipping
-    fn skip_special_cases(file1: &Path, file2: &Path) -> bool {
-        SimilarFilename::logseq_same_group(file1, file2)
-    }
+    pub fn skip_special_cases(
+        file1: &Path,
+        file2: &Path,
+        spacing_regex: &Regex,
+    ) -> Result<bool, CalculateError> {
+        let file1_str = get_filename(file1).0;
+        let file2_str = get_filename(file2).0;
 
-    /// Logseq has a special case if one startswith the other then
-    /// its probably a part of the same group
-    fn logseq_same_group(file1: &Path, file2: &Path) -> bool {
-        let file1 = get_filename(file1);
-        let file2 = get_filename(file2);
-        file1.to_string().starts_with(&file2.to_string())
-            || file2.to_string().starts_with(&file1.to_string())
+        // If file1 is a prefix of file2 (with spacing), or file2 is a prefix of file1 (with spacing)
+        // TODO: Compiling regex inside a loop is expensive
+        let regex_str1 = format!("^{}({})", regex::escape(&file1_str), spacing_regex.as_str());
+        let file1_is_prefix =
+            Regex::new(&regex_str1).map_err(|e| CalculateError::RegexCompilationError {
+                source: e,
+                compilation_string: regex_str1,
+                backtrace: Backtrace::force_capture(),
+            })?;
+        let regex_str2 = format!("^{}({})", regex::escape(&file2_str), spacing_regex.as_str());
+        let file2_is_prefix =
+            Regex::new(&regex_str2).map_err(|e| CalculateError::RegexCompilationError {
+                source: e,
+                compilation_string: regex_str2,
+                backtrace: Backtrace::force_capture(),
+            })?;
+
+        let out1 = file1_is_prefix.is_match(&file2_str);
+        let out2 = file2_is_prefix.is_match(&file1_str);
+        let out = out1 || out2;
+        Ok(out)
     }
 }

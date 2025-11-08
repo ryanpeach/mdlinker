@@ -7,16 +7,16 @@ pub mod rules;
 pub mod sed;
 pub mod visitor;
 
-use std::{backtrace::Backtrace, cell::RefCell, env, rc::Rc};
-
-use file::{get_files, name::ngrams};
+use console::{style, Emoji};
+use file::name::ngrams;
 use indicatif::ProgressBar;
 use miette::{Diagnostic, Result};
-use ngrams::MissingSubstringError;
+use ngrams::CalculateError;
 use rules::{
     broken_wikilink::BrokenWikilinkVisitor, duplicate_alias::DuplicateAliasVisitor,
     similar_filename::SimilarFilename, Report, ReportTrait, ThirdPassRule,
 };
+use std::{backtrace::Backtrace, cell::RefCell, env, rc::Rc};
 use strum::IntoEnumIterator;
 use thiserror::Error;
 use visitor::{parse, FinalizeError, ParseError, Visitor};
@@ -28,6 +28,13 @@ use crate::rules::VecHasIdExtensions;
 pub struct OutputReport {
     pub reports: Vec<Report>,
 }
+
+static FIRST_PASS: Emoji<'_, '_> = Emoji("📃  ", "");
+static SECOND_PASS: Emoji<'_, '_> = Emoji("🔗  ", "");
+static CHECK: Emoji<'_, '_> = Emoji("🔍  ", "");
+static FIXES: Emoji<'_, '_> = Emoji("🔧  ", "");
+static CHECK_AGAIN: Emoji<'_, '_> = Emoji("💡  ", "");
+static NO_FIXES: Emoji<'_, '_> = Emoji("🎉  ", "");
 
 impl OutputReport {
     /// Get if this is empty
@@ -82,7 +89,7 @@ pub enum OutputErrors {
     #[error(transparent)]
     RegexError(#[from] regex::Error),
     #[error(transparent)]
-    MissingSubstringError(#[from] MissingSubstringError),
+    CalculateError(#[from] CalculateError),
     #[error(transparent)]
     ParseError(#[from] ParseError),
     #[error(transparent)]
@@ -93,37 +100,69 @@ pub enum OutputErrors {
 
 use git2::{Error, Repository, StatusOptions};
 
-fn is_repo_dirty(repo: &Repository) -> Result<bool, Error> {
-    let mut options = StatusOptions::new();
-    options
-        .include_untracked(true)
-        .recurse_untracked_dirs(true)
-        .exclude_submodules(true)
-        .include_unmodified(false)
-        .include_ignored(false);
+pub enum RepoStatus {
+    Clean,
+    AllStaged,
+    Dirty,
+}
 
-    let statuses = repo.statuses(Some(&mut options))?;
-    Ok(!statuses.is_empty())
+impl RepoStatus {
+    fn get_repo_status(repo: &Repository) -> Result<RepoStatus, Error> {
+        let mut options = StatusOptions::new();
+        options
+            .include_untracked(true)
+            .recurse_untracked_dirs(true)
+            .exclude_submodules(true)
+            .include_unmodified(false)
+            .include_ignored(false);
+
+        let statuses = repo.statuses(Some(&mut options))?;
+        let mut staged = false;
+        let mut dirty = false;
+        for entry in statuses.iter() {
+            let status = entry.status();
+            if status.is_wt_new() || status.is_wt_modified() || status.is_wt_deleted() {
+                dirty = true;
+            }
+            if status.is_index_new() || status.is_index_modified() || status.is_index_deleted() {
+                staged = true;
+            }
+        }
+        match (dirty, staged) {
+            (true, true) => Ok(RepoStatus::AllStaged),
+            (true, false) => Ok(RepoStatus::Dirty),
+            (false, _) => Ok(RepoStatus::Clean),
+        }
+    }
 }
 
 /// Runs [`check`] in a loop until no more fixes can be made
+#[allow(clippy::result_large_err)]
 fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     // Check if the git repo is dirty
     match git2::Repository::open_from_env() {
-        Ok(git) => match is_repo_dirty(&git) {
-            Ok(is_dirty) => {
-                if !config.allow_dirty && is_dirty {
-                    return Err(OutputErrors::FixError(rules::FixError::DirtyRepo {
-                        backtrace: Backtrace::force_capture(),
-                    }));
-                }
+        Ok(git) => match (
+            RepoStatus::get_repo_status(&git),
+            config.allow_dirty,
+            config.allow_staged,
+        ) {
+            (Ok(RepoStatus::Dirty), false, _) => {
+                return Err(OutputErrors::FixError(rules::FixError::DirtyRepo {
+                    backtrace: Backtrace::force_capture(),
+                }));
             }
-            Err(e) => {
+            (Ok(RepoStatus::AllStaged), _, false) => {
+                return Err(OutputErrors::FixError(rules::FixError::UnstagedChanges {
+                    backtrace: Backtrace::force_capture(),
+                }));
+            }
+            (Err(e), _, _) => {
                 return Err(OutputErrors::FixError(rules::FixError::GitError {
                     source: e,
                     backtrace: Backtrace::force_capture(),
                 }));
             }
+            _ => {}
         },
         Err(e) => {
             return Err(OutputErrors::FixError(rules::FixError::GitError {
@@ -132,8 +171,29 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             }));
         }
     }
+    if env::var("RUNNING_TESTS").is_err() {
+        println!(
+            "{} {}Generating Error Reports...",
+            style("[1/3]").bold().dim(),
+            CHECK
+        );
+    }
 
     let mut output_report = check(config)?;
+
+    let bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
+        None
+    } else {
+        println!(
+            "{} {}Performing Fixes...",
+            style("[2/3]").bold().dim(),
+            FIXES
+        );
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_possible_truncation)]
+        Some(ProgressBar::new(output_report.reports.len() as u64))
+    };
+
     let mut any_fixes = false;
     for report in output_report.reports.clone() {
         if let Some(()) = match report {
@@ -148,21 +208,41 @@ fn fix(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         } {
             any_fixes = true;
         }
+        if let Some(bar) = &bar {
+            bar.inc(1);
+        }
+    }
+    if let Some(bar) = bar {
+        bar.finish_and_clear();
     }
 
     if any_fixes {
+        if env::var("RUNNING_TESTS").is_err() {
+            println!(
+                "{} {}Generating Error Reports After Fixes Applied...",
+                style("[3/3]").bold().dim(),
+                CHECK_AGAIN
+            );
+        }
         output_report = check(config)?;
+    } else if env::var("RUNNING_TESTS").is_err() {
+        println!(
+            "{} {}No Fixes Found...",
+            style("[3/3]").bold().dim(),
+            NO_FIXES
+        );
     }
 
     Ok(output_report)
 }
 
+#[allow(clippy::result_large_err)]
 fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     // Compile our regex patterns
     let boundary_regex = regex::Regex::new(&config.boundary_pattern)?;
     let filename_spacing_regex = regex::Regex::new(&config.filename_spacing_pattern)?;
 
-    let all_files = get_files(&config.directories());
+    let all_files = config.files().to_vec();
     let file_ngrams = ngrams(
         &all_files,
         config.ngram_size,
@@ -179,6 +259,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         &file_ngrams,
         config.filename_match_threshold,
         &filename_spacing_regex,
+        config,
     )?
     .finalize(&config.exclude);
     reports.extend(
@@ -193,9 +274,14 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     let first_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
         None
     } else {
+        println!(
+            "  {} {}Getting Aliases O(n)...",
+            style("[2/3]").bold().dim(),
+            FIRST_PASS
+        );
         #[allow(clippy::cast_sign_loss)]
         #[allow(clippy::cast_possible_truncation)]
-        Some(ProgressBar::new(all_files.len() as u64).with_prefix("First Pass"))
+        Some(ProgressBar::new(all_files.len() as u64))
     };
     let duplicate_alias_visitor = Rc::new(RefCell::new(DuplicateAliasVisitor::new(
         &all_files,
@@ -214,16 +300,21 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             .into_inner();
     reports.extend(duplicate_alias_visitor.finalize(&config.exclude)?);
     if let Some(bar) = &first_pass_bar {
-        bar.finish();
+        bar.finish_and_clear();
     }
 
     // Second Pass
     let second_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
         None
     } else {
+        println!(
+            "  {} {}Checking Links O(n)...",
+            style("[3/3]").bold().dim(),
+            SECOND_PASS
+        );
         #[allow(clippy::cast_sign_loss)]
         #[allow(clippy::cast_possible_truncation)]
-        Some(ProgressBar::new(all_files.len() as u64).with_prefix("Second Pass"))
+        Some(ProgressBar::new(all_files.len() as u64))
     };
     let mut visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![];
     for rule in ThirdPassRule::iter() {
@@ -255,7 +346,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         reports.extend(visitor_cell.finalize(&config.exclude)?);
     }
     if let Some(bar) = &second_pass_bar {
-        bar.finish();
+        bar.finish_and_clear();
     }
 
     Ok(OutputReport { reports })
@@ -271,6 +362,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
 ///
 /// Basically if this library fails, this returns an Err
 /// but if this library runs, even if it finds linting violations, this returns an Ok
+#[allow(clippy::result_large_err)]
 pub fn lib(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     if config.fix {
         fix(config)

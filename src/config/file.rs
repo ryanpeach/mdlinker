@@ -11,15 +11,17 @@ use crate::{
     sed::{ReplacePair, ReplacePairCompilationError},
 };
 
-use super::{NewConfigError, Partial};
+use super::{Config as MasterConfig, NewConfigError, Partial};
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub(super) struct Config {
-    /// See [`super::cli::Config::pages_directory`]
-    pub pages_directory: PathBuf,
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct Config {
+    /// See [`super::cli::Config::files`]
+    #[serde(default)]
+    pub files: Option<Vec<String>>,
 
-    /// See [`super::cli::Config::other_directories`]
-    pub other_directories: Vec<PathBuf>,
+    /// See [`super::cli::Config::new_files_directory`]
+    #[serde(default)]
+    pub new_files_directory: Option<PathBuf>,
 
     /// See [`super::cli::Config::ngram_size`]
     #[serde(default)]
@@ -28,10 +30,6 @@ pub(super) struct Config {
     /// See [`super::cli::Config::boundary_pattern`]
     #[serde(default)]
     pub boundary_pattern: Option<String>,
-
-    /// See [`super::cli::Config::wikilink_pattern`]
-    #[serde(default)]
-    pub wikilink_pattern: Option<String>,
 
     /// See [`super::cli::Config::filename_spacing_pattern`]
     #[serde(default)]
@@ -44,6 +42,11 @@ pub(super) struct Config {
     /// See [`super::cli::Config::exclude`]
     #[serde(default)]
     pub exclude: Vec<String>,
+
+    /// In the [`crate::rules::similar_filename::SimilarFilename`] rule, ignore certain word pairs
+    /// Prevents some annoying and frequent false positives
+    #[serde(default)]
+    pub ignore_word_pairs: Vec<(String, String)>,
 
     /// Convert an alias to a filename
     /// Kinda like a sed command
@@ -62,19 +65,79 @@ impl Config {
             std::fs::read_to_string(path).map_err(NewConfigError::FileDoesNotReadError)?;
         toml::from_str(&contents).map_err(NewConfigError::FileDoesNotParseError)
     }
+
+    #[must_use]
+    pub fn original_file_globs(&self) -> Option<Vec<String>> {
+        self.files.clone()
+    }
+}
+
+impl From<MasterConfig> for Config {
+    fn from(value: MasterConfig) -> Self {
+        Self {
+            files: value.original_file_globs,
+            new_files_directory: Some(value.new_files_directory),
+            ngram_size: Some(value.ngram_size),
+            boundary_pattern: Some(value.boundary_pattern),
+            filename_spacing_pattern: Some(value.filename_spacing_pattern),
+            filename_match_threshold: Some(value.filename_match_threshold),
+            exclude: value.exclude.into_iter().map(|x| x.0).collect(),
+            ignore_word_pairs: value.ignore_word_pairs,
+            alias_to_filename: value.alias_to_filename.into(),
+            filename_to_alias: value.filename_to_alias.into(),
+        }
+    }
 }
 
 impl Partial for Config {
-    fn pages_directory(&self) -> Option<PathBuf> {
-        Some(self.pages_directory.clone())
-    }
-    fn other_directories(&self) -> Option<Vec<PathBuf>> {
-        let out = self.other_directories.clone();
+    fn files(&self) -> Option<Vec<PathBuf>> {
+        let mut out = Vec::new();
+        match &self.files {
+            None => return None,
+            Some(files) if files.is_empty() => return None,
+            Some(files) => {
+                for file in files {
+                    if file.contains('*') {
+                        let globs = glob::glob(file);
+                        match globs {
+                            Ok(globs) => {
+                                for glob in globs {
+                                    match glob {
+                                        Ok(path) => {
+                                            out.push(path);
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Error processing glob '{file}': {e}",);
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Error parsing glob pattern '{file}': {e}");
+                                return None;
+                            }
+                        }
+                    } else {
+                        let path = PathBuf::from(file);
+                        if path.exists() {
+                            out.push(path);
+                        } else {
+                            eprintln!("File does not exist: {file}");
+                        }
+                    }
+                }
+            }
+        }
         if out.is_empty() {
+            eprintln!("No valid files found in the configuration.");
             None
         } else {
             Some(out)
         }
+    }
+
+    fn new_files_directory(&self) -> Option<PathBuf> {
+        self.new_files_directory.clone()
     }
 
     fn ngram_size(&self) -> Option<usize> {
@@ -136,7 +199,21 @@ impl Partial for Config {
     fn fix(&self) -> Option<bool> {
         None
     }
-    fn allow_dirty(&self) -> Option<bool> {
+    fn allow_dirty(&self) -> Result<Option<bool>, NewConfigError> {
+        Ok(None)
+    }
+    fn allow_staged(&self) -> Result<Option<bool>, NewConfigError> {
+        Ok(None)
+    }
+    fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>> {
+        if self.ignore_word_pairs.is_empty() {
+            None
+        } else {
+            Some(self.ignore_word_pairs.clone())
+        }
+    }
+
+    fn ignore_remaining(&self) -> Option<bool> {
         None
     }
 }

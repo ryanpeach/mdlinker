@@ -24,8 +24,7 @@ use std::{
 use thiserror::Error;
 
 use super::{
-    dedupe_by_code, filter_by_excludes, ErrorCode, FixError, HasId, Report, ReportTrait,
-    ThirdPassReport,
+    dedupe_by_code, filter_by_excludes, ErrorCode, FixError, Report, ReportTrait, ThirdPassReport,
 };
 
 pub const CODE: &str = "content::alias::unlinked";
@@ -50,11 +49,14 @@ pub struct UnlinkedText {
 }
 
 impl ReportTrait for UnlinkedText {
+    fn id(&self) -> ErrorCode {
+        self.id.clone()
+    }
     /// Open the file, surround the span in [[ ]], then save it
     /// TODO: Be able to handle this in parallel with other reports
     fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
         let file = self.src.name().to_owned();
-        trace!("Fixing unlinked text: {:?}", file);
+        trace!("Fixing unlinked text: {file:?}");
         let mut source = std::fs::read_to_string(&file).map_err(|src| FixError::IOError {
             source: src,
             file: file.clone(),
@@ -86,12 +88,6 @@ impl PartialEq for UnlinkedText {
 impl PartialOrd for UnlinkedText {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.id.partial_cmp(&other.id)
-    }
-}
-
-impl HasId for UnlinkedText {
-    fn id(&self) -> ErrorCode {
-        self.id.clone()
     }
 }
 

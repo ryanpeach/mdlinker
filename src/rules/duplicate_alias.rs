@@ -4,7 +4,7 @@ use crate::{
         content::{front_matter::FrontMatterVisitor, wikilink::Alias},
         name::{get_filename, Filename},
     },
-    ngrams::MissingSubstringError,
+    ngrams::CalculateError,
     sed::{ReplacePair, ReplacePairCompilationError},
     visitor::{FinalizeError, VisitError, Visitor},
 };
@@ -17,7 +17,7 @@ use std::{
 };
 use thiserror::Error;
 
-use super::{dedupe_by_code, filter_by_excludes, ErrorCode, FixError, HasId, Report, ReportTrait};
+use super::{dedupe_by_code, filter_by_excludes, ErrorCode, FixError, Report, ReportTrait};
 
 pub const CODE: &str = "name::alias::duplicate";
 
@@ -69,17 +69,14 @@ pub enum DuplicateAlias {
     },
 }
 impl ReportTrait for DuplicateAlias {
-    fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
-        Ok(None)
-    }
-}
-
-impl HasId for DuplicateAlias {
     fn id(&self) -> ErrorCode {
         match self {
             DuplicateAlias::FileNameContentDuplicate { id: code, .. }
             | DuplicateAlias::FileContentContentDuplicate { id: code, .. } => code.clone(),
         }
+    }
+    fn fix(&self, _config: &Config) -> Result<Option<()>, FixError> {
+        Ok(None)
     }
 }
 
@@ -151,14 +148,17 @@ impl Visitor for DuplicateAliasVisitor {
             // If it did not exist, we have a new alias in our table
             if let Some(out) = self.alias_table.insert(alias.clone(), path.into()) {
                 self.duplicate_aliases.insert(alias.clone());
-                self.duplicate_alias_errors.push(DuplicateAlias::new(
+                let found = DuplicateAlias::new(
                     &alias,
                     path,
                     Some(source),
                     &out,
                     None,
                     &self.filename_to_alias,
-                )?);
+                )?;
+                if let Some(found) = found {
+                    self.duplicate_alias_errors.push(found);
+                }
             }
         }
 
@@ -185,27 +185,11 @@ impl Visitor for DuplicateAliasVisitor {
 #[derive(Error, Debug)]
 pub enum NewDuplicateAliasError {
     #[error(transparent)]
-    MissingSubstringError(#[from] MissingSubstringError),
+    CalculateError(#[from] CalculateError),
     #[error(transparent)]
     ReplacePairError(#[from] ReplacePairCompilationError),
-    #[error("The file {filename} contains its own alias {alias}")]
-    AliasAndFilenameSame { filename: Filename, alias: Alias },
 }
-//
-// #[derive(Error, Debug)]
-// pub enum CalculateError {
-//     #[error(transparent)]
-//     MissingSubstringError(#[from] MissingSubstringError),
-//     #[error(transparent)]
-//     ReplacePairError(#[from] ReplacePairCompilationError),
-//     #[error(transparent)]
-//     FileError(#[from] file::Error),
-//     #[error(transparent)]
-//     NewDuplicateAliasError(#[from] NewDuplicateAliasError),
-//     #[error(transparent)]
-//     IoError(#[from] std::io::Error),
-// }
-//
+
 impl DuplicateAlias {
     /// Create a new diagnostic
     /// based on the two filenames and their similar ngrams
@@ -220,14 +204,11 @@ impl DuplicateAlias {
         file2_path: &Path,
         file2_content: Option<&str>,
         filename_to_alias: &ReplacePair<Filename, Alias>,
-    ) -> Result<Self, NewDuplicateAliasError> {
+    ) -> Result<Option<Self>, NewDuplicateAliasError> {
         assert!(!alias.to_string().is_empty());
         // Boundary conditions
         if file1_path == file2_path {
-            return Err(NewDuplicateAliasError::AliasAndFilenameSame {
-                filename: get_filename(file1_path),
-                alias: alias.clone(),
-            });
+            return Ok(None);
         }
 
         // Create the unique id
@@ -247,7 +228,7 @@ impl DuplicateAlias {
             let file2_content_found = file2_content
                 .to_lowercase()
                 .find(&alias.to_string())
-                .ok_or_else(|| MissingSubstringError {
+                .ok_or_else(|| CalculateError::MissingSubstringError {
                     path: file2_path.to_path_buf(),
                     ngram: alias.to_string(),
                     backtrace: std::backtrace::Backtrace::capture(),
@@ -259,13 +240,13 @@ impl DuplicateAlias {
                 alias.to_string().len(),
             );
 
-            Ok(DuplicateAlias::FileNameContentDuplicate {
+            Ok(Some(DuplicateAlias::FileNameContentDuplicate {
                 id: id.into(),
                 other_filename: get_filename(file1_path),
                 src: NamedSource::new(file2_path.to_string_lossy(), file2_content.to_string()),
                 alias: file2_content_span,
                 advice: format!("Delete the alias from {}", file2_path.to_string_lossy()),
-            })
+            }))
         } else if Alias::from_filename(&get_filename(file2_path), filename_to_alias) == *alias {
             Self::new(
                 alias,
@@ -280,7 +261,7 @@ impl DuplicateAlias {
             let file1_content_found = file1_content
                 .to_lowercase()
                 .find(&alias.to_string())
-                .ok_or_else(|| MissingSubstringError {
+                .ok_or_else(|| CalculateError::MissingSubstringError {
                     path: file1_path.to_path_buf(),
                     ngram: alias.to_string(),
                     backtrace: std::backtrace::Backtrace::capture(),
@@ -288,7 +269,7 @@ impl DuplicateAlias {
             let file2_content_found = file2_content
                 .to_lowercase()
                 .find(&alias.to_string())
-                .ok_or_else(|| MissingSubstringError {
+                .ok_or_else(|| CalculateError::MissingSubstringError {
                     path: file2_path.to_path_buf(),
                     ngram: alias.to_string(),
                     backtrace: std::backtrace::Backtrace::capture(),
@@ -304,7 +285,7 @@ impl DuplicateAlias {
                 alias.to_string().len(),
             );
 
-            Ok(DuplicateAlias::FileContentContentDuplicate {
+            Ok(Some(DuplicateAlias::FileContentContentDuplicate {
                 advice: format!("id: {id:?}"),
                 id: id.clone().into(),
                 other_filename: get_filename(file2_path),
@@ -318,7 +299,7 @@ impl DuplicateAlias {
                     alias: file2_content_span,
                     other: vec![],
                 }],
-            })
+            }))
         }
     }
 }

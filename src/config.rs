@@ -1,5 +1,5 @@
-mod cli;
-mod file;
+pub mod cli;
+pub mod file;
 use std::path::PathBuf;
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
         content::wikilink::Alias,
         name::{Filename, FilenameLowercase},
     },
-    rules::ErrorCode,
+    rules::{ErrorCode, ReportTrait},
     sed::{ReplacePair, ReplacePairCompilationError},
 };
 use bon::Builder;
@@ -31,17 +31,27 @@ pub enum NewConfigError {
     #[error("Pages directory missing")]
     #[help("Please provide a pages directory argument in either your cli or config file")]
     PagesDirectoryMissing,
+    #[error("Mutually exclusive options: {0} and {1}")]
+    MutuallyExclusiveError(String, String),
+    #[error("No files were passed to the config")]
+    NoFilesPassedError,
 }
 
 /// Config which contains both the cli and the config file
 /// Used to reconcile the two
 #[derive(Builder)]
 pub struct Config {
-    /// See [`self::cli::Config::pages_directory`]
-    pub pages_directory: PathBuf,
-    /// See [`self::cli::Config::other_directories`]
+    #[allow(clippy::struct_field_names)]
+    file_config: file::Config,
+    #[allow(clippy::struct_field_names)]
+    cli_config: cli::Config,
+    /// See [`self::cli::Config::files`]
     #[builder(default=vec![])]
-    pub other_directories: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
+    pub original_file_globs: Option<Vec<String>>,
+    /// See [`self::cli::Config::root_directory`]
+    #[builder(default=PathBuf::from("."))]
+    pub new_files_directory: PathBuf,
     /// See [`self::cli::Config::ngram_size`]
     #[builder(default = 2)]
     pub ngram_size: usize,
@@ -69,6 +79,15 @@ pub struct Config {
     /// See [`self::cli::Config::allow_dirty`]
     #[builder(default = false)]
     pub allow_dirty: bool,
+    /// See [`self::cli::Config::allow_staged`]
+    #[builder(default = false)]
+    pub allow_staged: bool,
+    /// See [`self::file::Config::ignore_word_pairs`]
+    #[builder(default = vec![])]
+    pub ignore_word_pairs: Vec<(String, String)>,
+    /// See [`self::cli::Config::ignore_remaining`]
+    #[builder(default = false)]
+    pub ignore_remaining: bool,
 }
 
 /// Things which implement the partial config trait
@@ -76,8 +95,8 @@ pub struct Config {
 /// these can be unioned with one another
 /// and then we can use that to create the final config
 pub trait Partial {
-    fn pages_directory(&self) -> Option<PathBuf>;
-    fn other_directories(&self) -> Option<Vec<PathBuf>>;
+    fn files(&self) -> Option<Vec<PathBuf>>;
+    fn new_files_directory(&self) -> Option<PathBuf>;
     fn ngram_size(&self) -> Option<usize>;
     fn boundary_pattern(&self) -> Option<String>;
     fn filename_spacing_pattern(&self) -> Option<String>;
@@ -90,7 +109,10 @@ pub trait Partial {
         &self,
     ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairCompilationError>>;
     fn fix(&self) -> Option<bool>;
-    fn allow_dirty(&self) -> Option<bool>;
+    fn allow_dirty(&self) -> Result<Option<bool>, NewConfigError>;
+    fn allow_staged(&self) -> Result<Option<bool>, NewConfigError>;
+    fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>>;
+    fn ignore_remaining(&self) -> Option<bool>;
 }
 
 /// Now we implement a combine function for patrial configs which
@@ -98,32 +120,84 @@ pub trait Partial {
 /// config.
 ///
 /// Note: This makes last elements in the input slice first priority
-fn combine_partials(partials: &[&dyn Partial]) -> Result<Config, NewConfigError> {
+fn combine_partials(
+    file_config: &file::Config,
+    cli_config: &cli::Config,
+) -> Result<Config, NewConfigError> {
     Ok(Config::builder()
-        .maybe_ngram_size(partials.iter().find_map(|p| p.ngram_size()))
-        .maybe_boundary_pattern(partials.iter().find_map(|p| p.boundary_pattern()))
-        .maybe_filename_spacing_pattern(partials.iter().find_map(|p| p.filename_spacing_pattern()))
-        .maybe_filename_match_threshold(partials.iter().find_map(|p| p.filename_match_threshold()))
-        .maybe_exclude(partials.iter().find_map(|p| p.exclude()))
-        .maybe_filename_to_alias(match partials.iter().find_map(|p| p.filename_to_alias()) {
-            Some(Ok(pair)) => Some(pair),
-            Some(Err(e)) => return Err(NewConfigError::ReplacePairCompilationError(e)),
-            None => None,
+        .file_config(file_config.clone())
+        .cli_config(cli_config.clone())
+        .files({
+            let files = cli_config.files().or(file_config.files());
+            match files {
+                Some(files) if !files.is_empty() => files,
+                _ => return Err(NewConfigError::NoFilesPassedError),
+            }
         })
-        .maybe_alias_to_filename(match partials.iter().find_map(|p| p.alias_to_filename()) {
-            Some(Ok(pair)) => Some(pair),
-            Some(Err(e)) => return Err(NewConfigError::ReplacePairCompilationError(e)),
-            None => None,
-        })
-        .maybe_fix(partials.iter().find_map(|p| p.fix()))
-        .maybe_allow_dirty(partials.iter().find_map(|p| p.allow_dirty()))
-        .pages_directory(
-            partials
-                .iter()
-                .find_map(|p| p.pages_directory())
-                .ok_or(NewConfigError::PagesDirectoryMissing)?,
+        .maybe_original_file_globs(file_config.original_file_globs())
+        .maybe_new_files_directory(
+            cli_config
+                .new_files_directory()
+                .or(file_config.new_files_directory()),
         )
-        .maybe_other_directories(partials.iter().find_map(|p| p.other_directories()))
+        .maybe_ngram_size(cli_config.ngram_size().or(file_config.ngram_size()))
+        .maybe_boundary_pattern(
+            cli_config
+                .boundary_pattern()
+                .or(file_config.boundary_pattern()),
+        )
+        .maybe_filename_spacing_pattern(
+            cli_config
+                .filename_spacing_pattern()
+                .or(file_config.filename_spacing_pattern()),
+        )
+        .maybe_filename_match_threshold(
+            cli_config
+                .filename_match_threshold()
+                .or(file_config.filename_match_threshold()),
+        )
+        .maybe_exclude(cli_config.exclude().or(file_config.exclude()))
+        .maybe_filename_to_alias({
+            match (
+                cli_config.filename_to_alias(),
+                file_config.filename_to_alias(),
+            ) {
+                (Some(Ok(cli)), None) => Some(cli),
+                (None, Some(Ok(file))) => Some(file),
+                (Some(Ok(cli)), Some(Ok(_file))) => Some(cli),
+                (_, Some(Err(e))) | (Some(Err(e)), _) => {
+                    return Err(NewConfigError::ReplacePairCompilationError(e))
+                }
+                (None, None) => None,
+            }
+        })
+        .maybe_alias_to_filename({
+            match (
+                cli_config.alias_to_filename(),
+                file_config.alias_to_filename(),
+            ) {
+                (Some(Ok(cli)), None) => Some(cli),
+                (None, Some(Ok(file))) => Some(file),
+                (Some(Ok(cli)), Some(Ok(_file))) => Some(cli),
+                (_, Some(Err(e))) | (Some(Err(e)), _) => {
+                    return Err(NewConfigError::ReplacePairCompilationError(e))
+                }
+                (None, None) => None,
+            }
+        })
+        .maybe_fix(cli_config.fix().or(file_config.fix()))
+        .maybe_allow_dirty(cli_config.allow_dirty()?.or(file_config.allow_dirty()?))
+        .maybe_allow_staged(cli_config.allow_staged()?.or(file_config.allow_staged()?))
+        .maybe_ignore_word_pairs(
+            cli_config
+                .ignore_word_pairs()
+                .or(file_config.ignore_word_pairs()),
+        )
+        .maybe_ignore_remaining(
+            cli_config
+                .ignore_remaining()
+                .or(file_config.ignore_remaining()),
+        )
         .build())
 }
 
@@ -132,9 +206,9 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// - [`Error::FileDoesNotExistError`] - Config file does not exist
-    /// - [`Error::FileDoesNotParseError`] - Config file does not parse from toml into the
-    ///     expected format
+    ///  - [`Error::FileDoesNotExistError`] - Config file does not exist
+    ///  - [`Error::FileDoesNotParseError`] - Config file does not parse from toml into the
+    ///    expected format
     ///
     pub fn new() -> Result<Self, NewConfigError> {
         let cli = cli::Config::parse();
@@ -152,15 +226,48 @@ impl Config {
         };
 
         // CLI has priority over file by being last
-        combine_partials(&[&file, &cli]).map_err(derive_more::Into::into)
+        let mut out = combine_partials(&file, &cli);
+
+        // Match on a ref to out, so we do NOT move the config out of `out`
+        if let Ok(ref mut config) = out {
+            config.cli_config = cli;
+            config.file_config = file;
+        }
+
+        // Now `out` is still valid (unchanged type), so we can return it
+        out
     }
 
     /// Legacy directories function
     /// Gets all the directories into one vec
     #[must_use]
-    pub fn directories(&self) -> Vec<PathBuf> {
-        let mut out = vec![self.pages_directory.clone()];
-        out.extend(self.other_directories.clone());
-        out
+    pub fn files(&self) -> &[PathBuf] {
+        &self.files
     }
+
+    pub fn add_report_to_ignore(&mut self, report: &impl ReportTrait) {
+        report.ignore(&mut self.file_config);
+    }
+
+    pub fn save_config(&self) -> Result<(), SaveConfigError> {
+        let toml_str =
+            toml::to_string(&self.file_config).map_err(|e| SaveConfigError::Toml { source: e })?;
+        std::fs::write(self.cli_config.config_path.clone(), toml_str)
+            .map_err(|e| SaveConfigError::Io { source: e })?;
+        Ok(())
+    }
+}
+
+#[derive(thiserror::Error, Debug, Diagnostic)]
+pub enum SaveConfigError {
+    #[error(transparent)]
+    Io {
+        #[backtrace]
+        source: io::Error,
+    },
+    #[error(transparent)]
+    Toml {
+        #[backtrace]
+        source: toml::ser::Error,
+    },
 }

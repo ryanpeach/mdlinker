@@ -11,6 +11,7 @@
 
 use std::backtrace::Backtrace;
 
+use crate::config::file::Config as FileConfig;
 use derive_more::derive::{Constructor, From, Into};
 use glob::Pattern;
 use miette::Diagnostic;
@@ -39,16 +40,10 @@ pub enum ThirdPassReport {
 /// A Reports error code, usually like `asdf::asdf::asdf`
 /// Uniquely identifies a violation of a rule, and can be deduped by Eq
 #[derive(Debug, Constructor, PartialEq, Eq, PartialOrd, Ord, Clone, From, Into)]
-pub struct ErrorCode(String);
-
-/// All reports should have a code that can be human readable
-/// Codes's should also be useful to deduplicate errors before presenting them to the user
-pub trait HasId {
-    fn id(&self) -> ErrorCode;
-}
+pub struct ErrorCode(pub String);
 
 #[must_use]
-pub fn filter_code<T: HasId>(errors: Vec<T>, code: &ErrorCode) -> Vec<T> {
+pub fn filter_code<T: ReportTrait>(errors: Vec<T>, code: &ErrorCode) -> Vec<T> {
     errors
         .into_iter()
         .filter(|item| item.id().0.starts_with(&code.0))
@@ -58,13 +53,13 @@ pub fn filter_code<T: HasId>(errors: Vec<T>, code: &ErrorCode) -> Vec<T> {
 /// Implemented for all vectors of items that implement [`HasId`]
 pub trait VecHasIdExtensions<T>
 where
-    T: HasId + PartialOrd,
+    T: ReportTrait + PartialOrd,
 {
     #[must_use]
     fn finalize(self, excludes: &[ErrorCode]) -> Self;
 }
 
-fn filter_by_excludes<T: HasId>(mut this: Vec<T>, excludes: &[ErrorCode]) -> Vec<T> {
+fn filter_by_excludes<T: ReportTrait>(mut this: Vec<T>, excludes: &[ErrorCode]) -> Vec<T> {
     this.retain(|item| {
         !excludes.iter().any(|exclude| {
             Pattern::new(&exclude.0.to_lowercase())
@@ -75,7 +70,7 @@ fn filter_by_excludes<T: HasId>(mut this: Vec<T>, excludes: &[ErrorCode]) -> Vec
     this
 }
 
-fn dedupe_by_code<T: HasId + PartialOrd>(mut this: Vec<T>) -> Vec<T> {
+fn dedupe_by_code<T: ReportTrait + PartialOrd>(mut this: Vec<T>) -> Vec<T> {
     // Make sure things with
     // a higher "value" are first before deduping
     this.sort_by(|b, a| a.partial_cmp(b).expect("This never fails"));
@@ -84,18 +79,24 @@ fn dedupe_by_code<T: HasId + PartialOrd>(mut this: Vec<T>) -> Vec<T> {
 }
 
 /// Used for filtering out items that start with the exclude code
-impl<T: HasId + PartialOrd> VecHasIdExtensions<T> for Vec<T> {
-    #[must_use]
+impl<T: ReportTrait + PartialOrd> VecHasIdExtensions<T> for Vec<T> {
     fn finalize(self, excludes: &[ErrorCode]) -> Self {
         dedupe_by_code(filter_by_excludes(self, excludes))
     }
 }
 
+/// Returned by [`ReportTrait::fix`]
 #[derive(Error, Debug, Diagnostic)]
 pub enum FixError {
     #[error("The git repo is dirty")]
     #[help("Please commit or stash your changes")]
     DirtyRepo {
+        #[backtrace]
+        backtrace: Backtrace,
+    },
+    #[error("The git repo has unstaged changes")]
+    #[help("Please stage your changes")]
+    UnstagedChanges {
         #[backtrace]
         backtrace: Backtrace,
     },
@@ -115,10 +116,20 @@ pub enum FixError {
 }
 
 pub trait ReportTrait {
+    /// All reports should have a code that can be human readable
+    /// Codes's should also be useful to deduplicate errors before presenting them to the user
+    fn id(&self) -> ErrorCode;
+
     /// Returns a [`FixError`] if it tried to fix things but failed
     /// Returns [`Some`] if it fixed things
     /// Returns [`None`] if it did not even try to fix things
     fn fix(&self, config: &Config) -> Result<Option<()>, FixError>;
+
+    /// Adds the id to the config file as an ignore
+    /// This has a default implementation
+    fn ignore(&self, config: &mut FileConfig) {
+        config.exclude.push(self.id().0);
+    }
 }
 
 pub mod broken_wikilink;
