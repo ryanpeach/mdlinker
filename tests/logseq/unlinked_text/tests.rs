@@ -31,7 +31,7 @@ fn number_of_unlinked_texts() {
     for unlinked_texts in &report.unlinked_texts() {
         debug!("{unlinked_texts:#?}");
     }
-    assert_eq!(report.unlinked_texts().len(), 3);
+    assert_eq!(report.unlinked_texts().len(), 4);
 }
 
 /// This passes because the link is valid
@@ -106,4 +106,18 @@ fn icazyvey_exists_and_is_not_wikilink_in_journal() {
     let offset = SourceOffset::from_location(source, 11, 106);
     assert_eq!(err.span.offset(), offset.offset());
     assert_eq!(err.span.len(), 8);
+}
+
+/// Tests that linking is right after a non-standard character like "right parentheses" U+2019
+#[test]
+fn lorem_exists_and_is_not_wikilink_in_journal() {
+    info!("lorem_exists_and_is_not_wikilink_in_journal");
+    let report = get_report(PATHS.as_slice());
+    let err_list = filter_code(
+        report.unlinked_texts(),
+        &format!("{}::foo::lorem", unlinked_text::CODE).into(),
+    );
+    let err = err_list.iter().exactly_one().unwrap();
+    assert_eq!(err.span.offset(), 85);
+    assert_eq!(err.span.len(), 5);
 }
