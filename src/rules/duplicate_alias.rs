@@ -8,7 +8,9 @@ use crate::{
     sed::{ReplacePair, ReplacePairCompilationError},
     visitor::{FinalizeError, VisitError, Visitor},
 };
+use bon::bon;
 use comrak::{arena_tree::Node, nodes::Ast};
+use getset::Getters;
 use hashbrown::{HashMap, HashSet};
 use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
 use std::{
@@ -92,25 +94,27 @@ impl PartialOrd for DuplicateAlias {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Getters)]
 pub struct DuplicateAliasVisitor {
     /// Put an alias in get a file that contains that alias (or is named after the alias) out
     /// Also useful for telling you if you have seen this alias before
+    /// We eventually take this as the output of the visitor so it's pub
     pub alias_table: HashMap<Alias, PathBuf>,
     /// These are the duplicate alias diagnostics for miette
-    pub duplicate_alias_errors: Vec<DuplicateAlias>,
+    duplicate_alias_errors: Vec<DuplicateAlias>,
     /// This is just the duplicate aliases themselves, useful for downstream tasks
-    pub duplicate_aliases: HashSet<Alias>,
+    duplicate_aliases: HashSet<Alias>,
     /// Our main visitor, helps us get aliases from files, needs to be reset each file
     front_matter_visitor: FrontMatterVisitor,
     /// Just need to strore this for later to get aliases from filenames
     filename_to_alias: ReplacePair<Filename, Alias>,
 }
 
+#[bon]
 impl DuplicateAliasVisitor {
     pub const NODE_KIND: &'static str = "alias";
 
-    #[must_use]
+    #[builder]
     pub fn new(all_files: &Vec<PathBuf>, filename_to_alias: &ReplacePair<Filename, Alias>) -> Self {
         // First collect the files in the directories as aliases
         let mut alias_table = HashMap::new();

@@ -20,6 +20,7 @@ use std::{
     backtrace::Backtrace,
     cell::RefCell,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 use thiserror::Error;
 
@@ -93,8 +94,6 @@ impl PartialOrd for UnlinkedText {
 
 #[derive(Debug, Getters)]
 pub struct UnlinkedTextVisitor {
-    #[get = "pub"]
-    alias_table: HashMap<Alias, PathBuf>,
     ac: AhoCorasick,
     patterns: Vec<String>,
     new_unlinked_texts: Vec<(Alias, SourceSpan, Sourcepos)>,
@@ -106,7 +105,7 @@ pub struct UnlinkedTextVisitor {
 #[bon]
 impl UnlinkedTextVisitor {
     #[builder]
-    pub fn new(alias_table: HashMap<Alias, PathBuf>) -> Result<Self, BuildError> {
+    pub fn new(alias_table: &Rc<HashMap<Alias, PathBuf>>) -> Result<Self, BuildError> {
         let patterns: Vec<String> = alias_table
             .keys()
             .map(std::string::ToString::to_string)
@@ -115,7 +114,6 @@ impl UnlinkedTextVisitor {
             .ascii_case_insensitive(true)
             .build(&patterns)?;
         Ok(Self {
-            alias_table,
             patterns,
             ac,
             wikilink_visitor: WikilinkVisitor::new(),

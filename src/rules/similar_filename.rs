@@ -3,6 +3,7 @@ use crate::{
     file::name::get_filename,
     ngrams::{CalculateError, Ngram},
 };
+use bon::bon;
 use console::{style, Emoji};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
@@ -46,6 +47,7 @@ pub struct SimilarFilename {
     #[help]
     advice: String,
 }
+
 impl ReportTrait for SimilarFilename {
     fn id(&self) -> ErrorCode {
         self.id.clone()
@@ -72,10 +74,12 @@ impl PartialEq for SimilarFilename {
     }
 }
 
+#[bon]
 impl SimilarFilename {
     /// Create a new diagnostic
     /// based on the two filenames and their similar ngrams
     ///
+    #[builder]
     pub fn new(
         file1_path: &Path,
         file1_ngram: &Ngram,
@@ -220,14 +224,16 @@ impl SimilarFilename {
                 let score = score1.max(score2);
                 if let Some(score) = score {
                     if score > filename_match_threshold {
-                        matches.push(SimilarFilename::new(
-                            filepath,
-                            ngram,
-                            other_filepath,
-                            other_ngram,
-                            spacing_regex,
-                            score,
-                        )?);
+                        matches.push(
+                            SimilarFilename::builder()
+                                .file1_path(filepath)
+                                .file1_ngram(ngram)
+                                .file2_path(other_filepath)
+                                .file2_ngram(other_ngram)
+                                .spacing_regex(spacing_regex)
+                                .score(score)
+                                .build()?,
+                        );
                         break;
                     }
                 }

@@ -14,9 +14,11 @@ use crate::{
 };
 use bon::{bon, Builder};
 use comrak::{arena_tree::Node, nodes::Ast};
+use getset::Getters;
 use hashbrown::HashMap;
 use log::trace;
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
+use std::rc::Rc;
 use thiserror::Error;
 
 use super::{
@@ -78,19 +80,21 @@ impl PartialOrd for BrokenWikilink {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Getters)]
 pub struct BrokenWikilinkVisitor {
-    pub alias_table: HashMap<Alias, PathBuf>,
-    pub wikilinks_visitor: WikilinkVisitor,
-    pub broken_wikilinks: Vec<BrokenWikilink>,
+    alias_table: Rc<HashMap<Alias, PathBuf>>,
+    additional_aliases_table: HashMap<Alias, PathBuf>,
+    wikilinks_visitor: WikilinkVisitor,
+    broken_wikilinks: Vec<BrokenWikilink>,
 }
 
 #[bon]
 impl BrokenWikilinkVisitor {
     #[builder]
-    pub fn new(all_files: &[PathBuf], mut alias_table: HashMap<Alias, PathBuf>) -> Self {
+    pub fn new(all_files: &[PathBuf], alias_table: Rc<HashMap<Alias, PathBuf>>) -> Self {
         // In this case we need to add all the filepaths in all their forms to the alias as well
         // to handle wikilinks which are more like filenames and filepaths
+        let mut additional_aliases_table: HashMap<Alias, PathBuf> = HashMap::new();
         for filepath in all_files {
             let filepath_as_list: Vec<String> = filepath
                 .iter()
@@ -104,16 +108,17 @@ impl BrokenWikilinkVisitor {
                     .next()
                     .unwrap_or(&with_extension)
                     .to_string();
-                alias_table
+                additional_aliases_table
                     .entry(Alias::new(&with_extension))
                     .or_insert_with(|| filepath.clone());
-                alias_table
+                additional_aliases_table
                     .entry(Alias::new(&without_extension))
                     .or_insert_with(|| filepath.clone());
             }
         }
         Self {
             alias_table,
+            additional_aliases_table,
             wikilinks_visitor: WikilinkVisitor::new(),
             broken_wikilinks: Vec::new(),
         }
@@ -138,7 +143,9 @@ impl Visitor for BrokenWikilinkVisitor {
         for wikilink in wikilinks {
             let alias = wikilink.alias;
             let id = format!("{CODE}::{filename}::{alias}");
-            if !self.alias_table.contains_key(&alias) {
+            if !self.alias_table.contains_key(&alias)
+                && !self.additional_aliases_table.contains_key(&alias)
+            {
                 self.broken_wikilinks.push(
                     BrokenWikilink::builder()
                         .advice(format!(

@@ -257,10 +257,12 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         #[allow(clippy::cast_possible_truncation)]
         Some(ProgressBar::new(all_files.len() as u64))
     };
-    let duplicate_alias_visitor = Rc::new(RefCell::new(DuplicateAliasVisitor::new(
-        &all_files,
-        &config.filename_to_alias,
-    )));
+    let duplicate_alias_visitor = Rc::new(RefCell::new(
+        DuplicateAliasVisitor::builder()
+            .all_files(&all_files)
+            .filename_to_alias(&config.filename_to_alias)
+            .build(),
+    ));
     for file in &all_files {
         let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![duplicate_alias_visitor.clone()];
         parse(file, visitors)?;
@@ -276,6 +278,9 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     if let Some(bar) = &second_pass_bar {
         bar.finish_and_clear();
     }
+    // Finally "take" the alias table from the duplicate alias visitor (destroying it)
+    // and store it locally in an Rc for everyone to share
+    let alias_table = Rc::new(duplicate_alias_visitor.alias_table);
 
     // Third Pass
     // We now have a duplicate alias visitor which contains an alias table
@@ -297,12 +302,12 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         visitors.push(match rule {
             ThirdPassRule::UnlinkedText => Rc::new(RefCell::new(
                 rules::unlinked_text::UnlinkedTextVisitor::builder()
-                    .alias_table(duplicate_alias_visitor.alias_table.clone())
+                    .alias_table(&alias_table)
                     .build()?,
             )),
             ThirdPassRule::BrokenWikilink => Rc::new(RefCell::new(
                 BrokenWikilinkVisitor::builder()
-                    .alias_table(duplicate_alias_visitor.alias_table.clone())
+                    .alias_table(alias_table.clone())
                     .all_files(&all_files)
                     .build(),
             )),
