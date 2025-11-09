@@ -9,6 +9,7 @@ pub mod visitor;
 
 use console::{style, Emoji};
 use file::name::ngrams;
+use getset::Getters;
 use indicatif::ProgressBar;
 use miette::{Diagnostic, Result};
 use ngrams::CalculateError;
@@ -25,8 +26,10 @@ use crate::rules::VecHasIdExtensions;
 
 /// A miette diagnostic that controls the printout of errors to the user
 /// Put a vector of all outputs in a new field with a #[related] macro above it
+#[derive(Getters)]
 pub struct OutputReport {
-    pub reports: Vec<Report>,
+    #[get = "pub"]
+    reports: Vec<Report>,
 }
 
 static FIRST_PASS: Emoji<'_, '_> = Emoji("📃  ", "");

@@ -35,4 +35,5 @@ fn test_path_wikilink_has_8_wikilinks_all_pointing_to_baz_md() {
     }
 
     let report = get_report(PATHS.as_slice(), Some(config));
+    report
 }

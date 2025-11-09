@@ -18,34 +18,34 @@ fn main() -> Result<()> {
         }
         Ok(e) => {
             println!();
-            for report in e.reports {
+            for report in e.reports() {
                 match report {
                     MdReport::SimilarFilename(e) => {
                         nb_errors += 1;
                         eprintln!("{:?}", Report::from(e.clone()));
                         if config.ignore_remaining {
-                            config.add_report_to_ignore(&e);
+                            config.add_report_to_ignore(e);
                         }
                     }
                     MdReport::DuplicateAlias(e) => {
                         nb_errors += 1;
                         eprintln!("{:?}", Report::from(e.clone()));
                         if config.ignore_remaining {
-                            config.add_report_to_ignore(&e);
+                            config.add_report_to_ignore(e);
                         }
                     }
                     MdReport::ThirdPass(ThirdPassReport::BrokenWikilink(e)) => {
                         nb_errors += 1;
                         eprintln!("{:?}", Report::from(e.clone()));
                         if config.ignore_remaining {
-                            config.add_report_to_ignore(&e);
+                            config.add_report_to_ignore(e);
                         }
                     }
                     MdReport::ThirdPass(ThirdPassReport::UnlinkedText(e)) => {
                         nb_errors += 1;
                         eprintln!("{:?}", Report::from(e.clone()));
                         if config.ignore_remaining {
-                            config.add_report_to_ignore(&e);
+                            config.add_report_to_ignore(e);
                         }
                     }
                 }
