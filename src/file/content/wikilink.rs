@@ -33,6 +33,10 @@ impl Alias {
     pub fn char_len(&self) -> usize {
         self.0.chars().count()
     }
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl Alias {

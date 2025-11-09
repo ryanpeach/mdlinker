@@ -16,7 +16,7 @@ use bon::{bon, Builder};
 use comrak::{arena_tree::Node, nodes::Ast};
 use getset::Getters;
 use hashbrown::HashMap;
-use log::trace;
+use log::{trace, warn};
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
 use std::rc::Rc;
 use thiserror::Error;
@@ -146,6 +146,14 @@ impl Visitor for BrokenWikilinkVisitor {
             if !self.alias_table.contains_key(&alias)
                 && !self.additional_aliases_table.contains_key(&alias)
             {
+                if alias.as_str().starts_with('.') || alias.as_str().contains("..") {
+                    warn!(
+                        "Skipping broken wikilink '{}' in {} because it looks like a relative path",
+                        alias,
+                        path.to_string_lossy()
+                    );
+                    continue;
+                }
                 self.broken_wikilinks.push(
                     BrokenWikilink::builder()
                         .advice(format!(
