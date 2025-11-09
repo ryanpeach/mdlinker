@@ -65,17 +65,18 @@ impl Config {
             std::fs::read_to_string(path).map_err(NewConfigError::FileDoesNotReadError)?;
         toml::from_str(&contents).map_err(NewConfigError::FileDoesNotParseError)
     }
-
-    #[must_use]
-    pub fn original_file_globs(&self) -> Option<Vec<String>> {
-        self.files.clone()
-    }
 }
 
 impl From<MasterConfig> for Config {
     fn from(value: MasterConfig) -> Self {
         Self {
-            files: value.original_file_globs,
+            files: Some(
+                value
+                    .files
+                    .iter()
+                    .map(|x| x.to_string_lossy().to_string())
+                    .collect(),
+            ),
             new_files_directory: Some(value.new_files_directory),
             ngram_size: Some(value.ngram_size),
             boundary_pattern: Some(value.boundary_pattern),
