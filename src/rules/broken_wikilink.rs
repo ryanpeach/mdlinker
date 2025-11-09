@@ -1,23 +1,24 @@
 use std::{
     backtrace::Backtrace,
     cell::RefCell,
-    path::{Path, PathBuf},
+    path::{self, Path, PathBuf},
 };
 
 use crate::{
     config::Config,
     file::{
         content::wikilink::{Alias, WikilinkVisitor},
-        name::{get_filename, Filename, FilenameLowercase},
+        name::{get_filename, FilenameLowercase},
     },
-    sed::ReplacePair,
     visitor::{FinalizeError, VisitError, Visitor},
 };
-use bon::Builder;
+use bon::{bon, Builder};
 use comrak::{arena_tree::Node, nodes::Ast};
+use getset::Getters;
 use hashbrown::HashMap;
-use log::trace;
+use log::{trace, warn};
 use miette::{Diagnostic, NamedSource, Result, SourceSpan};
+use std::rc::Rc;
 use thiserror::Error;
 
 use super::{
@@ -79,22 +80,45 @@ impl PartialOrd for BrokenWikilink {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Getters)]
 pub struct BrokenWikilinkVisitor {
-    pub alias_table: HashMap<Alias, PathBuf>,
-    pub wikilinks_visitor: WikilinkVisitor,
-    pub broken_wikilinks: Vec<BrokenWikilink>,
+    alias_table: Rc<HashMap<Alias, PathBuf>>,
+    additional_aliases_table: HashMap<Alias, PathBuf>,
+    wikilinks_visitor: WikilinkVisitor,
+    broken_wikilinks: Vec<BrokenWikilink>,
 }
 
+#[bon]
 impl BrokenWikilinkVisitor {
-    #[must_use]
-    pub fn new(
-        _all_files: &[PathBuf],
-        _filename_to_alias: &ReplacePair<Filename, Alias>,
-        alias_table: HashMap<Alias, PathBuf>,
-    ) -> Self {
+    #[builder]
+    pub fn new(all_files: &[PathBuf], alias_table: Rc<HashMap<Alias, PathBuf>>) -> Self {
+        // In this case we need to add all the filepaths in all their forms to the alias as well
+        // to handle wikilinks which are more like filenames and filepaths
+        let mut additional_aliases_table: HashMap<Alias, PathBuf> = HashMap::new();
+        for filepath in all_files {
+            let filepath_as_list: Vec<String> = filepath
+                .iter()
+                .map(|x| x.to_string_lossy().to_string())
+                .collect();
+            for i in 1..=filepath_as_list.len() {
+                let with_extension = filepath_as_list[filepath_as_list.len() - i..]
+                    .join(path::MAIN_SEPARATOR.to_string().as_str());
+                let without_extension = with_extension
+                    .split('.')
+                    .next()
+                    .unwrap_or(&with_extension)
+                    .to_string();
+                additional_aliases_table
+                    .entry(Alias::new(&with_extension))
+                    .or_insert_with(|| filepath.clone());
+                additional_aliases_table
+                    .entry(Alias::new(&without_extension))
+                    .or_insert_with(|| filepath.clone());
+            }
+        }
         Self {
             alias_table,
+            additional_aliases_table,
             wikilinks_visitor: WikilinkVisitor::new(),
             broken_wikilinks: Vec::new(),
         }
@@ -119,7 +143,17 @@ impl Visitor for BrokenWikilinkVisitor {
         for wikilink in wikilinks {
             let alias = wikilink.alias;
             let id = format!("{CODE}::{filename}::{alias}");
-            if !self.alias_table.contains_key(&alias) {
+            if !self.alias_table.contains_key(&alias)
+                && !self.additional_aliases_table.contains_key(&alias)
+            {
+                if alias.as_str().starts_with('.') || alias.as_str().contains("..") {
+                    warn!(
+                        "Skipping broken wikilink '{}' in {} because it looks like a relative path",
+                        alias,
+                        path.to_string_lossy()
+                    );
+                    continue;
+                }
                 self.broken_wikilinks.push(
                     BrokenWikilink::builder()
                         .advice(format!(

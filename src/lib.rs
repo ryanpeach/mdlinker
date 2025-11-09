@@ -9,6 +9,7 @@ pub mod visitor;
 
 use console::{style, Emoji};
 use file::name::ngrams;
+use getset::Getters;
 use indicatif::ProgressBar;
 use miette::{Diagnostic, Result};
 use ngrams::CalculateError;
@@ -25,8 +26,10 @@ use crate::rules::VecHasIdExtensions;
 
 /// A miette diagnostic that controls the printout of errors to the user
 /// Put a vector of all outputs in a new field with a #[related] macro above it
+#[derive(Getters)]
 pub struct OutputReport {
-    pub reports: Vec<Report>,
+    #[get = "pub"]
+    reports: Vec<Report>,
 }
 
 static FIRST_PASS: Emoji<'_, '_> = Emoji("📃  ", "");
@@ -96,6 +99,8 @@ pub enum OutputErrors {
     FinalizeError(#[from] FinalizeError),
     #[error(transparent)]
     FixError(#[from] rules::FixError),
+    #[error(transparent)]
+    BuildError(#[from] aho_corasick::BuildError),
 }
 
 use git2::{Error, Repository, StatusOptions};
@@ -252,7 +257,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
 
     let mut reports: Vec<Report> = vec![];
 
-    // Filename pass
+    // First pass
     // Just over filenames
     // NOTE: Always use `filter_by_excludes` and `dedupe_by_code` on the reports
     let similar_filenames = SimilarFilename::calculate(
@@ -268,10 +273,10 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             .map(|x| Report::SimilarFilename(x.clone())),
     );
 
-    // First pass
+    // Second pass
     // This gives us metadata we need for all other rules from the content of files
-    //  The duplicate alias visitor has to run first to get the table of aliases
-    let first_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
+    // The duplicate alias visitor has to run first to get the table of aliases
+    let second_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
         None
     } else {
         println!(
@@ -283,14 +288,16 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         #[allow(clippy::cast_possible_truncation)]
         Some(ProgressBar::new(all_files.len() as u64))
     };
-    let duplicate_alias_visitor = Rc::new(RefCell::new(DuplicateAliasVisitor::new(
-        &all_files,
-        &config.filename_to_alias,
-    )));
+    let duplicate_alias_visitor = Rc::new(RefCell::new(
+        DuplicateAliasVisitor::builder()
+            .all_files(&all_files)
+            .filename_to_alias(&config.filename_to_alias)
+            .build(),
+    ));
     for file in &all_files {
         let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![duplicate_alias_visitor.clone()];
         parse(file, visitors)?;
-        if let Some(bar) = &first_pass_bar {
+        if let Some(bar) = &second_pass_bar {
             bar.inc(1);
         }
     }
@@ -299,12 +306,17 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             .expect("parse is done")
             .into_inner();
     reports.extend(duplicate_alias_visitor.finalize(&config.exclude)?);
-    if let Some(bar) = &first_pass_bar {
+    if let Some(bar) = &second_pass_bar {
         bar.finish_and_clear();
     }
+    // Finally "take" the alias table from the duplicate alias visitor (destroying it)
+    // and store it locally in an Rc for everyone to share
+    let alias_table = Rc::new(duplicate_alias_visitor.alias_table);
 
-    // Second Pass
-    let second_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
+    // Third Pass
+    // We now have a duplicate alias visitor which contains an alias table
+    // All aliases are contained within, mapped to the file which they reference
+    let third_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
         None
     } else {
         println!(
@@ -320,23 +332,22 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     for rule in ThirdPassRule::iter() {
         visitors.push(match rule {
             ThirdPassRule::UnlinkedText => Rc::new(RefCell::new(
-                rules::unlinked_text::UnlinkedTextVisitor::new(
-                    &all_files,
-                    &config.filename_to_alias,
-                    duplicate_alias_visitor.alias_table.clone(),
-                ),
+                rules::unlinked_text::UnlinkedTextVisitor::builder()
+                    .alias_table(&alias_table)
+                    .build()?,
             )),
-            ThirdPassRule::BrokenWikilink => Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
-                &all_files,
-                &config.filename_to_alias,
-                duplicate_alias_visitor.alias_table.clone(),
-            ))),
+            ThirdPassRule::BrokenWikilink => Rc::new(RefCell::new(
+                BrokenWikilinkVisitor::builder()
+                    .alias_table(alias_table.clone())
+                    .all_files(&all_files)
+                    .build(),
+            )),
         });
     }
 
     for file in &all_files {
         parse(file, visitors.clone())?;
-        if let Some(bar) = &second_pass_bar {
+        if let Some(bar) = &third_pass_bar {
             bar.inc(1);
         }
     }
@@ -345,7 +356,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         let mut visitor_cell = (*visitor).borrow_mut();
         reports.extend(visitor_cell.finalize(&config.exclude)?);
     }
-    if let Some(bar) = &second_pass_bar {
+    if let Some(bar) = &third_pass_bar {
         bar.finish_and_clear();
     }
 

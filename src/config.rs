@@ -48,7 +48,6 @@ pub struct Config {
     /// See [`self::cli::Config::files`]
     #[builder(default=vec![])]
     pub files: Vec<PathBuf>,
-    pub original_file_globs: Option<Vec<String>>,
     /// See [`self::cli::Config::root_directory`]
     #[builder(default=PathBuf::from("."))]
     pub new_files_directory: PathBuf,
@@ -134,7 +133,6 @@ fn combine_partials(
                 _ => return Err(NewConfigError::NoFilesPassedError),
             }
         })
-        .maybe_original_file_globs(file_config.original_file_globs())
         .maybe_new_files_directory(
             cli_config
                 .new_files_directory()

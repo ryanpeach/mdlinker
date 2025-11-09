@@ -1,7 +1,5 @@
-use std::{
-    cell::RefCell,
-    fmt::{Display, Formatter},
-};
+use derive_more::{Display, From, Into};
+use std::cell::RefCell;
 
 use crate::{
     file::name::Filename,
@@ -19,7 +17,7 @@ use regex::Regex;
 
 /// A linkable string, like that in a wikilink, or its corresponding filename
 /// Aliases are always lowercase
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Display, From, Into)]
 pub struct Alias(String);
 
 impl Alias {
@@ -35,17 +33,9 @@ impl Alias {
     pub fn char_len(&self) -> usize {
         self.0.chars().count()
     }
-}
-
-impl Display for Alias {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<String> for Alias {
-    fn from(s: String) -> Self {
-        Self::new(&s)
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 

@@ -1,4 +1,4 @@
-//! Code used in multiple test folders
+//! Code used in testing and in lib usage to get the report programmatically.
 use std::path::PathBuf;
 
 use mdlinker::{
@@ -6,21 +6,9 @@ use mdlinker::{
     lib,
 };
 
-use std::sync::Once;
-
-static INIT: Once = Once::new();
-
-/// Setup function that is only run once, even if called multiple times.
-fn setup() {
-    INIT.call_once(|| {
-        env_logger::init();
-    });
-}
-
 /// Runs the library and generates the [`mdlinker::OutputReport`]
 #[must_use]
 pub fn get_report(paths: &[PathBuf], config: Option<Config>) -> mdlinker::OutputReport {
-    setup();
     let config: Config = match config {
         None => Config::builder()
             .files(paths.to_vec())
@@ -30,5 +18,7 @@ pub fn get_report(paths: &[PathBuf], config: Option<Config>) -> mdlinker::Output
         Some(config) => config,
     };
 
+    // There "no error" here should mean the lib should return the report and not itself generate an error.
+    // There can definitely be errors in the report.
     lib(&config).expect("There should have been no error.")
 }

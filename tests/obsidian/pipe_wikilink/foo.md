@@ -1,0 +1,6 @@
+---
+aliases:
+  - foobar
+---
+
+# Foo

@@ -2,24 +2,25 @@ use crate::{
     config::Config,
     file::{
         content::wikilink::{Alias, WikilinkVisitor},
-        name::{get_filename, Filename},
+        name::get_filename,
     },
-    sed::ReplacePair,
     visitor::{FinalizeError, VisitError, Visitor},
 };
-use aho_corasick::AhoCorasick;
-use bon::Builder;
+use aho_corasick::{AhoCorasick, BuildError};
+use bon::{bon, Builder};
 use comrak::{
     arena_tree::Node,
     nodes::{Ast, NodeValue, Sourcepos},
 };
+use getset::Getters;
 use hashbrown::HashMap;
 use log::trace;
-use miette::{Diagnostic, NamedSource, Result, SourceOffset, SourceSpan};
+use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
 use std::{
     backtrace::Backtrace,
     cell::RefCell,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 use thiserror::Error;
 
@@ -91,27 +92,34 @@ impl PartialOrd for UnlinkedText {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Getters)]
 pub struct UnlinkedTextVisitor {
-    pub alias_table: HashMap<Alias, PathBuf>,
+    ac: AhoCorasick,
+    patterns: Vec<String>,
     new_unlinked_texts: Vec<(Alias, SourceSpan, Sourcepos)>,
     wikilink_visitor: WikilinkVisitor,
-    pub unlinked_texts: Vec<UnlinkedText>,
+    #[get = "pub"]
+    unlinked_texts: Vec<UnlinkedText>,
 }
 
+#[bon]
 impl UnlinkedTextVisitor {
-    #[must_use]
-    pub fn new(
-        _all_files: &[PathBuf],
-        _filename_to_alias: &ReplacePair<Filename, Alias>,
-        alias_table: HashMap<Alias, PathBuf>,
-    ) -> Self {
-        Self {
-            alias_table,
+    #[builder]
+    pub fn new(alias_table: &Rc<HashMap<Alias, PathBuf>>) -> Result<Self, BuildError> {
+        let patterns: Vec<String> = alias_table
+            .keys()
+            .map(std::string::ToString::to_string)
+            .collect();
+        let ac = AhoCorasick::builder()
+            .ascii_case_insensitive(true)
+            .build(&patterns)?;
+        Ok(Self {
+            patterns,
+            ac,
             wikilink_visitor: WikilinkVisitor::new(),
             unlinked_texts: Vec::new(),
             new_unlinked_texts: Vec::new(),
-        }
+        })
     }
 }
 
@@ -161,23 +169,15 @@ impl Visitor for UnlinkedTextVisitor {
         let sourcepos = data_ref.sourcepos;
         let parent = node.parent();
         if let NodeValue::Text(text) = data {
-            let patterns: Vec<String> = self
-                .alias_table
-                .keys()
-                .map(std::string::ToString::to_string)
-                .collect();
-            let ac = AhoCorasick::builder()
-                .ascii_case_insensitive(true)
-                .build(&patterns)?;
             // Make sure neither the character before or after is a letter
             // This makes sure you aren't matching a part of a word
             // This should also handle tags
             // Check the character before the match
-            for found in ac.find_iter(text) {
+            for found in self.ac.find_iter(text) {
                 if !is_whole_word_match(text, found.start(), found.end()) {
                     continue;
                 }
-                let alias = Alias::new(&patterns[found.pattern().as_usize()]);
+                let alias = Alias::new(&self.patterns[found.pattern().as_usize()]);
                 let sourcepos_start_offset_bytes = SourceOffset::from_location(
                     source,
                     sourcepos.start.line,
