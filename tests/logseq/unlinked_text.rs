@@ -103,7 +103,7 @@ fn icazyvey_exists_and_is_not_wikilink_in_journal() {
         &format!("{}::2024_08_10::icazyvey", unlinked_text::CODE).into(),
     );
     let err = err_list.iter().exactly_one().unwrap();
-    let source = fs::read_to_string("./tests/logseq/unlinked_text/assets/journals/2024_08_10.md")
+    let source = fs::read_to_string("./tests/logseq/unlinked_text/journals/2024_08_10.md")
         .expect("This exists at compile time");
     let offset = SourceOffset::from_location(source, 11, 106);
     assert_eq!(err.span.offset(), offset.offset());

@@ -36,7 +36,7 @@ fn groups_first_element_same() {
 
     let report = get_report(PATHS.as_slice(), Some(config));
 
-    assert_eq!(report.reports.len(), 2, "{:?}", report.reports);
+    assert_eq!(report.reports().len(), 2, "{:?}", report.reports());
 }
 
 /// [`foo.md`](./assets/logseq/pages/foo.md) and [`fooo.md`](./assets/logseq/pages/fooo.md) should conflict because
@@ -58,7 +58,7 @@ fn test_ignore_word_pairs1() {
 
     let report = get_report(PATHS.as_slice(), Some(config));
 
-    assert_eq!(report.reports.len(), 1, "{:?}", report.reports);
+    assert_eq!(report.reports().len(), 1, "{:?}", report.reports());
 }
 
 /// [`bar.md`](./assets/logseq/pages/bar.md) and [`barr.md`](./assets/logseq/pages/barr.md) should conflict because
@@ -83,7 +83,7 @@ fn test_ignore_word_pairs2() {
 
     let report = get_report(PATHS.as_slice(), Some(config));
 
-    assert_eq!(report.reports.len(), 0, "{:?}", report.reports);
+    assert_eq!(report.reports().len(), 0, "{:?}", report.reports());
 }
 
 #[test]
