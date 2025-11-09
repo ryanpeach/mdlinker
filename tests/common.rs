@@ -18,5 +18,7 @@ pub fn get_report(paths: &[PathBuf], config: Option<Config>) -> mdlinker::Output
         Some(config) => config,
     };
 
+    // There "no error" here should mean the lib should return the report and not itself generate an error.
+    // There can definitely be errors in the report.
     lib(&config).expect("There should have been no error.")
 }

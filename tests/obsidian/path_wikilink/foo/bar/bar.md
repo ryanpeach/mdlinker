@@ -1,4 +1,4 @@
-# Baz
+# Bar
 
 ## Valid
 

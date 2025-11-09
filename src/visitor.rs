@@ -136,7 +136,7 @@ pub fn parse(path: &PathBuf, visitors: Vec<Rc<RefCell<dyn Visitor>>>) -> Result<
     let arena = Arena::new();
     let options = ExtensionOptions::builder()
         .front_matter_delimiter("---".to_string())
-        .wikilinks_title_before_pipe(true)
+        .wikilinks_title_after_pipe(true)
         .build();
     let root = parse_document(
         &arena,
