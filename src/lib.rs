@@ -300,11 +300,12 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
                     .alias_table(duplicate_alias_visitor.alias_table.clone())
                     .build()?,
             )),
-            ThirdPassRule::BrokenWikilink => Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
-                &all_files,
-                &config.filename_to_alias,
-                duplicate_alias_visitor.alias_table.clone(),
-            ))),
+            ThirdPassRule::BrokenWikilink => Rc::new(RefCell::new(
+                BrokenWikilinkVisitor::builder()
+                    .alias_table(duplicate_alias_visitor.alias_table.clone())
+                    .all_files(&all_files)
+                    .build(),
+            )),
         });
     }
 
