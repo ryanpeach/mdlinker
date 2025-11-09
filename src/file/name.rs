@@ -1,8 +1,6 @@
+use derive_more::derive::{Display, From, Into};
 use hashbrown::HashMap;
-use std::{
-    fmt::{Display, Formatter},
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use regex::Regex;
 
@@ -19,8 +17,8 @@ use super::content::wikilink::Alias;
 ///
 /// # Example
 /// `asdf/Foo___Bar.md` -> `Foo___Bar`
-#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct Filename(pub String);
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, Display, From, Into)]
+pub struct Filename(String);
 
 impl Filename {
     #[must_use]
@@ -33,21 +31,9 @@ impl Filename {
     }
 }
 
-impl Display for Filename {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<String> for Filename {
-    fn from(s: String) -> Self {
-        Self::new(&s)
-    }
-}
-
 /// Sometimes you are given a lowercase [`Filename`] and you have to make due
-#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct FilenameLowercase(pub String);
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, Display, From, Into)]
+pub struct FilenameLowercase(String);
 
 impl FilenameLowercase {
     #[must_use]
@@ -58,18 +44,6 @@ impl FilenameLowercase {
     #[must_use]
     pub fn from_alias(alias: &Alias, config: &Config) -> FilenameLowercase {
         config.alias_to_filename.apply(alias)
-    }
-}
-
-impl Display for FilenameLowercase {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<String> for FilenameLowercase {
-    fn from(s: String) -> Self {
-        Self::new(&s)
     }
 }
 

@@ -247,8 +247,8 @@ impl SimilarFilename {
         file2: &Path,
         spacing_regex: &Regex,
     ) -> Result<bool, CalculateError> {
-        let file1_str = get_filename(file1).0;
-        let file2_str = get_filename(file2).0;
+        let file1_str: String = get_filename(file1).into();
+        let file2_str: String = get_filename(file2).into();
 
         // If file1 is a prefix of file2 (with spacing), or file2 is a prefix of file1 (with spacing)
         // TODO: Compiling regex inside a loop is expensive

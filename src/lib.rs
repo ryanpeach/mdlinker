@@ -226,7 +226,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
 
     let mut reports: Vec<Report> = vec![];
 
-    // Filename pass
+    // First pass
     // Just over filenames
     // NOTE: Always use `filter_by_excludes` and `dedupe_by_code` on the reports
     let similar_filenames = SimilarFilename::calculate(
@@ -242,10 +242,10 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             .map(|x| Report::SimilarFilename(x.clone())),
     );
 
-    // First pass
+    // Second pass
     // This gives us metadata we need for all other rules from the content of files
-    //  The duplicate alias visitor has to run first to get the table of aliases
-    let first_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
+    // The duplicate alias visitor has to run first to get the table of aliases
+    let second_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
         None
     } else {
         println!(
@@ -264,7 +264,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     for file in &all_files {
         let visitors: Vec<Rc<RefCell<dyn Visitor>>> = vec![duplicate_alias_visitor.clone()];
         parse(file, visitors)?;
-        if let Some(bar) = &first_pass_bar {
+        if let Some(bar) = &second_pass_bar {
             bar.inc(1);
         }
     }
@@ -273,12 +273,14 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
             .expect("parse is done")
             .into_inner();
     reports.extend(duplicate_alias_visitor.finalize(&config.exclude)?);
-    if let Some(bar) = &first_pass_bar {
+    if let Some(bar) = &second_pass_bar {
         bar.finish_and_clear();
     }
 
-    // Second Pass
-    let second_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
+    // Third Pass
+    // We now have a duplicate alias visitor which contains an alias table
+    // All aliases are contained within, mapped to the file which they reference
+    let third_pass_bar: Option<ProgressBar> = if env::var("RUNNING_TESTS").is_ok() {
         None
     } else {
         println!(
@@ -308,7 +310,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
 
     for file in &all_files {
         parse(file, visitors.clone())?;
-        if let Some(bar) = &second_pass_bar {
+        if let Some(bar) = &third_pass_bar {
             bar.inc(1);
         }
     }
@@ -317,7 +319,7 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
         let mut visitor_cell = (*visitor).borrow_mut();
         reports.extend(visitor_cell.finalize(&config.exclude)?);
     }
-    if let Some(bar) = &second_pass_bar {
+    if let Some(bar) = &third_pass_bar {
         bar.finish_and_clear();
     }
 
