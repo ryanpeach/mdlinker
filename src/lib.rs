@@ -99,6 +99,8 @@ pub enum OutputErrors {
     FinalizeError(#[from] FinalizeError),
     #[error(transparent)]
     FixError(#[from] rules::FixError),
+    #[error(transparent)]
+    BuildError(#[from] aho_corasick::BuildError),
 }
 
 use git2::{Error, Repository, StatusOptions};
@@ -292,11 +294,9 @@ fn check(config: &config::Config) -> Result<OutputReport, OutputErrors> {
     for rule in ThirdPassRule::iter() {
         visitors.push(match rule {
             ThirdPassRule::UnlinkedText => Rc::new(RefCell::new(
-                rules::unlinked_text::UnlinkedTextVisitor::new(
-                    &all_files,
-                    &config.filename_to_alias,
-                    duplicate_alias_visitor.alias_table.clone(),
-                ),
+                rules::unlinked_text::UnlinkedTextVisitor::builder()
+                    .alias_table(duplicate_alias_visitor.alias_table.clone())
+                    .build()?,
             )),
             ThirdPassRule::BrokenWikilink => Rc::new(RefCell::new(BrokenWikilinkVisitor::new(
                 &all_files,
