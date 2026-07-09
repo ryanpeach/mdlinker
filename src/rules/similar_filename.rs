@@ -56,6 +56,7 @@ impl ReportTrait for SimilarFilename {
     fn ignore(&self, config: &mut FileConfig) {
         config
             .ignore_word_pairs
+            .get_or_insert_with(Vec::new)
             .push((self.file1_ngram.to_string(), self.file2_ngram.to_string()));
     }
 }

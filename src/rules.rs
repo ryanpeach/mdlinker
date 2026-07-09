@@ -128,7 +128,7 @@ pub trait ReportTrait {
     /// Adds the id to the config file as an ignore
     /// This has a default implementation
     fn ignore(&self, config: &mut FileConfig) {
-        config.exclude.push(self.id().0);
+        config.exclude.get_or_insert_with(Vec::new).push(self.id().0);
     }
 }
 

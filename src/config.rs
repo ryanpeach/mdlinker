@@ -12,6 +12,7 @@ use crate::{
 };
 use bon::Builder;
 use clap::Parser;
+use merge::Merge;
 use miette::Diagnostic;
 use std::io;
 use thiserror;
@@ -90,114 +91,113 @@ pub struct Config {
     pub ignore_remaining: bool,
 }
 
-/// Things which implement the partial config trait
-/// implement functions which return optionals
-/// these can be unioned with one another
-/// and then we can use that to create the final config
-pub trait Partial {
-    fn files(&self) -> Option<Vec<PathBuf>>;
-    fn new_files_directory(&self) -> Option<PathBuf>;
-    fn ngram_size(&self) -> Option<usize>;
-    fn boundary_pattern(&self) -> Option<String>;
-    fn filename_spacing_pattern(&self) -> Option<String>;
-    fn filename_match_threshold(&self) -> Option<i64>;
-    fn exclude(&self) -> Option<Vec<ErrorCode>>;
-    fn filename_to_alias(
-        &self,
-    ) -> Option<Result<ReplacePair<Filename, Alias>, ReplacePairCompilationError>>;
-    fn alias_to_filename(
-        &self,
-    ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairCompilationError>>;
-    fn fix(&self) -> Option<bool>;
-    fn allow_dirty(&self) -> Result<Option<bool>, NewConfigError>;
-    fn allow_staged(&self) -> Result<Option<bool>, NewConfigError>;
-    fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>>;
-    fn ignore_remaining(&self) -> Option<bool>;
+/// Expand a list of file globs/paths into concrete, existing [`PathBuf`]s.
+///
+/// Entries containing `*` are treated as glob patterns; everything else is treated as
+/// a literal path and kept only if it exists. Invalid globs and missing files are
+/// reported to stderr and skipped.
+fn expand_files(globs: &[String]) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for file in globs {
+        if file.contains('*') {
+            match glob::glob(file) {
+                Ok(paths) => {
+                    for path in paths {
+                        match path {
+                            Ok(path) => out.push(path),
+                            Err(e) => eprintln!("Error processing glob '{file}': {e}"),
+                        }
+                    }
+                }
+                Err(e) => eprintln!("Error parsing glob pattern '{file}': {e}"),
+            }
+        } else {
+            let path = PathBuf::from(file);
+            if path.exists() {
+                out.push(path);
+            } else {
+                eprintln!("File does not exist: {file}");
+            }
+        }
+    }
+    out
 }
 
-/// Now we implement a combine function for patrial configs which
-/// iterates over the partials and if they have a Some field they use that field in the final
-/// config.
+/// Build a [`ReplacePair`] from an optional `(from, to)` regex tuple.
 ///
-/// Note: This makes last elements in the input slice first priority
-fn combine_partials(
-    file_config: &file::Config,
-    cli_config: &cli::Config,
-) -> Result<Config, NewConfigError> {
+/// `None` and an empty `("", "")` pair both mean "unset" (so the master default is
+/// used); a half-empty pair is a compilation error, matching the previous behaviour.
+fn build_replace_pair<T, U>(
+    pair: Option<(String, String)>,
+) -> Result<Option<ReplacePair<T, U>>, NewConfigError>
+where
+    T: ToString + From<String>,
+    U: ToString + From<String>,
+{
+    let Some((from, to)) = pair else {
+        return Ok(None);
+    };
+    match (from.is_empty(), to.is_empty()) {
+        (true, true) => Ok(None),
+        (false, false) => Ok(Some(ReplacePair::new(&from, &to)?)),
+        (true, false) => Err(ReplacePairCompilationError::ToError(regex::Error::Syntax(
+            "To is empty".to_string(),
+        ))
+        .into()),
+        (false, true) => Err(ReplacePairCompilationError::FromError(regex::Error::Syntax(
+            "From is empty".to_string(),
+        ))
+        .into()),
+    }
+}
+
+/// Merge the CLI and file partials (CLI wins), then apply defaults, transforms, and
+/// validation to produce the final [`Config`].
+///
+/// This is the single place a setting's default/transform/validation lives — adding a
+/// setting means adding a field to [`file::Config`] and one `.maybe_*` line here.
+fn resolve(file_config: file::Config, cli_config: cli::Config) -> Result<Config, NewConfigError> {
+    // CLI has priority: its `Some` values are kept, and only its `None` holes are
+    // filled from the file. See `merge::Merge for Option`.
+    let mut merged = cli_config.to_partial();
+    merged.merge(file_config.clone());
+
+    let files = expand_files(&merged.files.clone().unwrap_or_default());
+    if files.is_empty() {
+        return Err(NewConfigError::NoFilesPassedError);
+    }
+
+    // allow_dirty and allow_staged are mutually exclusive
+    if merged.allow_dirty.unwrap_or(false) && merged.allow_staged.unwrap_or(false) {
+        return Err(NewConfigError::MutuallyExclusiveError(
+            "allow_dirty".to_string(),
+            "allow_staged".to_string(),
+        ));
+    }
+
     Ok(Config::builder()
-        .file_config(file_config.clone())
-        .cli_config(cli_config.clone())
-        .files({
-            let files = cli_config.files().or(file_config.files());
-            match files {
-                Some(files) if !files.is_empty() => files,
-                _ => return Err(NewConfigError::NoFilesPassedError),
-            }
-        })
-        .maybe_original_file_globs(file_config.original_file_globs())
-        .maybe_new_files_directory(
-            cli_config
-                .new_files_directory()
-                .or(file_config.new_files_directory()),
+        .file_config(file_config)
+        .cli_config(cli_config)
+        .files(files)
+        .maybe_original_file_globs(merged.files.clone())
+        .maybe_new_files_directory(merged.new_files_directory.clone())
+        .maybe_ngram_size(merged.ngram_size)
+        .maybe_boundary_pattern(merged.boundary_pattern.clone())
+        .maybe_filename_spacing_pattern(merged.filename_spacing_pattern.clone())
+        .maybe_filename_match_threshold(merged.filename_match_threshold)
+        .maybe_exclude(
+            merged
+                .exclude
+                .clone()
+                .map(|codes| codes.into_iter().map(ErrorCode::new).collect()),
         )
-        .maybe_ngram_size(cli_config.ngram_size().or(file_config.ngram_size()))
-        .maybe_boundary_pattern(
-            cli_config
-                .boundary_pattern()
-                .or(file_config.boundary_pattern()),
-        )
-        .maybe_filename_spacing_pattern(
-            cli_config
-                .filename_spacing_pattern()
-                .or(file_config.filename_spacing_pattern()),
-        )
-        .maybe_filename_match_threshold(
-            cli_config
-                .filename_match_threshold()
-                .or(file_config.filename_match_threshold()),
-        )
-        .maybe_exclude(cli_config.exclude().or(file_config.exclude()))
-        .maybe_filename_to_alias({
-            match (
-                cli_config.filename_to_alias(),
-                file_config.filename_to_alias(),
-            ) {
-                (Some(Ok(cli)), None) => Some(cli),
-                (None, Some(Ok(file))) => Some(file),
-                (Some(Ok(cli)), Some(Ok(_file))) => Some(cli),
-                (_, Some(Err(e))) | (Some(Err(e)), _) => {
-                    return Err(NewConfigError::ReplacePairCompilationError(e))
-                }
-                (None, None) => None,
-            }
-        })
-        .maybe_alias_to_filename({
-            match (
-                cli_config.alias_to_filename(),
-                file_config.alias_to_filename(),
-            ) {
-                (Some(Ok(cli)), None) => Some(cli),
-                (None, Some(Ok(file))) => Some(file),
-                (Some(Ok(cli)), Some(Ok(_file))) => Some(cli),
-                (_, Some(Err(e))) | (Some(Err(e)), _) => {
-                    return Err(NewConfigError::ReplacePairCompilationError(e))
-                }
-                (None, None) => None,
-            }
-        })
-        .maybe_fix(cli_config.fix().or(file_config.fix()))
-        .maybe_allow_dirty(cli_config.allow_dirty()?.or(file_config.allow_dirty()?))
-        .maybe_allow_staged(cli_config.allow_staged()?.or(file_config.allow_staged()?))
-        .maybe_ignore_word_pairs(
-            cli_config
-                .ignore_word_pairs()
-                .or(file_config.ignore_word_pairs()),
-        )
-        .maybe_ignore_remaining(
-            cli_config
-                .ignore_remaining()
-                .or(file_config.ignore_remaining()),
-        )
+        .maybe_filename_to_alias(build_replace_pair(merged.filename_to_alias.clone())?)
+        .maybe_alias_to_filename(build_replace_pair(merged.alias_to_filename.clone())?)
+        .maybe_fix(merged.fix)
+        .maybe_allow_dirty(merged.allow_dirty)
+        .maybe_allow_staged(merged.allow_staged)
+        .maybe_ignore_word_pairs(merged.ignore_word_pairs.clone())
+        .maybe_ignore_remaining(merged.ignore_remaining)
         .build())
 }
 
@@ -215,27 +215,15 @@ impl Config {
 
         // If the config file doesn't exist, and it's not the default, error out
         let file = if cli.config_path.is_file() {
-            match file::Config::new(&cli.config_path) {
-                Ok(file) => file,
-                Err(report) => Err(report)?,
-            }
+            file::Config::new(&cli.config_path)?
         } else {
-            Err(NewConfigError::FileDoesNotExistError {
-                path: cli.config_path.clone(),
-            })?
+            return Err(NewConfigError::FileDoesNotExistError {
+                path: cli.config_path,
+            });
         };
 
-        // CLI has priority over file by being last
-        let mut out = combine_partials(&file, &cli);
-
-        // Match on a ref to out, so we do NOT move the config out of `out`
-        if let Ok(ref mut config) = out {
-            config.cli_config = cli;
-            config.file_config = file;
-        }
-
-        // Now `out` is still valid (unchanged type), so we can return it
-        out
+        // CLI has priority over the file; see `resolve`
+        resolve(file, cli)
     }
 
     /// Legacy directories function
@@ -270,4 +258,56 @@ pub enum SaveConfigError {
         #[backtrace]
         source: toml::ser::Error,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression test: `filename_to_alias` must be built from the `filename_to_alias`
+    /// field, not `alias_to_filename`. A previous copy-paste bug read the wrong field,
+    /// so setting a distinct `filename_to_alias` in a config was silently ignored. No
+    /// fixture set these fields, so the defaults (which are exact inverses) hid the bug.
+    #[test]
+    fn filename_to_alias_uses_its_own_field() {
+        // Distinct pairs so the two directions cannot be confused: filename_to_alias
+        // maps "___" -> "/", alias_to_filename maps "/" -> "-".
+        let file = file::Config {
+            files: Some(vec!["Cargo.toml".to_string()]),
+            filename_to_alias: Some(("___".to_string(), "/".to_string())),
+            alias_to_filename: Some(("/".to_string(), "-".to_string())),
+            ..Default::default()
+        };
+        let config = resolve(file, cli::Config::default()).expect("resolve should succeed");
+
+        // If the old bug were present, filename_to_alias would be built from the
+        // alias_to_filename pair ("/" -> "-") and leave "a___b" unchanged.
+        let alias = config
+            .filename_to_alias
+            .apply(&Filename("a___b".to_string()));
+        assert_eq!(alias.to_string(), "a/b");
+    }
+
+    /// The CLI takes priority over the file, and file values fill the holes the CLI
+    /// leaves. This exercises the `merge` precedence that `resolve` relies on.
+    #[test]
+    fn cli_overrides_file_and_file_fills_holes() {
+        let file = file::Config {
+            files: Some(vec!["Cargo.toml".to_string()]),
+            ngram_size: Some(2),
+            boundary_pattern: Some("from-file".to_string()),
+            ..Default::default()
+        };
+        let cli = cli::Config {
+            ngram_size: Some(1),
+            ..Default::default()
+        };
+        let config = resolve(file, cli).expect("resolve should succeed");
+
+        assert_eq!(config.ngram_size, 1, "CLI value must win");
+        assert_eq!(
+            config.boundary_pattern, "from-file",
+            "file value must fill the hole the CLI left"
+        );
+    }
 }

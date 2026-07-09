@@ -1,17 +1,7 @@
 use clap::Parser;
 use std::path::PathBuf;
 
-use crate::{
-    config::NewConfigError,
-    file::{
-        content::wikilink::Alias,
-        name::{Filename, FilenameLowercase},
-    },
-    rules::ErrorCode,
-    sed::{ReplacePair, ReplacePairCompilationError},
-};
-
-use super::Partial;
+use super::file::Config as PartialConfig;
 
 #[derive(Parser, Default, Clone)]
 #[command(version, about, long_about = None)]
@@ -22,7 +12,7 @@ pub struct Config {
 
     /// A location to store new files in created by --fix
     /// for the [`super::rules::broken_wikilink::BrokenWikilink`] rule
-    #[clap(short = 'n', long = "newf")]
+    #[clap(short = 'N', long = "newf")]
     pub new_files_directory: Option<PathBuf>,
 
     /// Path to a configuration file
@@ -76,74 +66,43 @@ pub struct Config {
     pub ignore_remaining: bool,
 }
 
-impl Partial for Config {
-    fn files(&self) -> Option<Vec<PathBuf>> {
-        if self.files.is_empty() {
-            None
-        } else {
-            Some(self.files.clone())
+impl Config {
+    /// Map the CLI arguments into a [`PartialConfig`] so they can be merged with the
+    /// file config. Fields the CLI does not expose (the sed pairs, `ignore_word_pairs`)
+    /// stay `None`. Empty positional/multi-value args map to `None` so an unset CLI
+    /// value does not clobber a file value during the merge. Boolean flags always map
+    /// to `Some`, so a CLI-set flag wins and the file cannot override it — matching the
+    /// previous behaviour.
+    #[must_use]
+    pub fn to_partial(&self) -> PartialConfig {
+        PartialConfig {
+            files: if self.files.is_empty() {
+                None
+            } else {
+                Some(
+                    self.files
+                        .iter()
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .collect(),
+                )
+            },
+            new_files_directory: self.new_files_directory.clone(),
+            ngram_size: self.ngram_size,
+            boundary_pattern: self.boundary_pattern.clone(),
+            filename_spacing_pattern: self.filename_spacing_pattern.clone(),
+            filename_match_threshold: self.filename_match_threshold,
+            exclude: if self.exclude.is_empty() {
+                None
+            } else {
+                Some(self.exclude.clone())
+            },
+            ignore_word_pairs: None,
+            alias_to_filename: None,
+            filename_to_alias: None,
+            fix: Some(self.fix),
+            allow_dirty: Some(self.allow_dirty),
+            allow_staged: Some(self.allow_staged),
+            ignore_remaining: Some(self.ignore_remaining),
         }
-    }
-    fn new_files_directory(&self) -> Option<PathBuf> {
-        self.new_files_directory.clone()
-    }
-    fn ngram_size(&self) -> Option<usize> {
-        self.ngram_size
-    }
-    fn boundary_pattern(&self) -> Option<String> {
-        self.boundary_pattern.clone()
-    }
-    fn filename_spacing_pattern(&self) -> Option<String> {
-        self.filename_spacing_pattern.clone()
-    }
-    fn filename_match_threshold(&self) -> Option<i64> {
-        self.filename_match_threshold
-    }
-    fn exclude(&self) -> Option<Vec<ErrorCode>> {
-        let out = self.exclude.clone();
-        if out.is_empty() {
-            None
-        } else {
-            Some(out.into_iter().map(ErrorCode::new).collect())
-        }
-    }
-    fn filename_to_alias(
-        &self,
-    ) -> Option<Result<ReplacePair<Filename, Alias>, ReplacePairCompilationError>> {
-        None
-    }
-    fn alias_to_filename(
-        &self,
-    ) -> Option<Result<ReplacePair<Alias, FilenameLowercase>, ReplacePairCompilationError>> {
-        None
-    }
-    fn fix(&self) -> Option<bool> {
-        Some(self.fix)
-    }
-    fn allow_dirty(&self) -> Result<Option<bool>, NewConfigError> {
-        if self.allow_staged && self.allow_dirty {
-            Err(NewConfigError::MutuallyExclusiveError(
-                "allow_staged".to_string(),
-                "allow_dirty".to_string(),
-            ))
-        } else {
-            Ok(Some(self.allow_dirty))
-        }
-    }
-    fn allow_staged(&self) -> Result<Option<bool>, NewConfigError> {
-        if self.allow_staged && self.allow_dirty {
-            Err(NewConfigError::MutuallyExclusiveError(
-                "allow_staged".to_string(),
-                "allow_dirty".to_string(),
-            ))
-        } else {
-            Ok(Some(self.allow_staged))
-        }
-    }
-    fn ignore_word_pairs(&self) -> Option<Vec<(String, String)>> {
-        None
-    }
-    fn ignore_remaining(&self) -> Option<bool> {
-        Some(self.ignore_remaining)
     }
 }
