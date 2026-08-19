@@ -33,6 +33,8 @@ Put a `mdlinker.toml` in your project root to configure the linter.
 
 Options are defined in [`src/config/file.rs`](src/config/file.rs) as a serde object, and can be overwritten in the cli, see `mdlinker --help` and the docstrings for full details.
 
+You don't need to copy and paste this into your repo, just use `mdlinker init`
+
 ```toml
 # These are any other files or folders you wish to scan.
 files = ["journal/foo.md", "notes/**/*.md"]
@@ -55,9 +57,9 @@ ignore_word_pairs = [
 # The Similar Filename rule can match on n_grams, like "Barrack Obama". But in order to do this, you need to set the max number of words in an ngram.
 # You really don't need to change any of these
 ngram_size = 3
-boundary_pattern = r"___" # This is a regex pattern to match on filenames to stop ngram generation (like at a hierarchy or sentence boundary). In logseq this is represented with three underscores.
+boundary_pattern = "___" # This is a regex pattern to match on filenames to stop ngram generation (like at a hierarchy or sentence boundary). In logseq this is represented with three underscores.
 filename_match_threshold = 100 # This is the similarity threshold for the similar filename rule. It is an integer corresponding to the output of the [fuzzy-matcher](https://github.com/skim-rs/fuzzy-matcher) crate.
-filename_spacing_pattern = "-|_|\s" # This is a regex pattern to split filenames into words. It is used for the ngram generation.
+filename_spacing_pattern = "-|_|\\s" # This is a regex pattern to split filenames into words. It is used for the ngram generation.
 
 # Compatibility
 # These are options that are meant to help us eventually prototype this system for other tools like obsidian. They convert filenames in the "pages_directory" to aliases, and aliases to filenames in the "pages_directory". Do not change these unless you know what you are doing.
